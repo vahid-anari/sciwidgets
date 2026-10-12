@@ -1,3 +1,10 @@
+# sciwidgets
+
+PySide6 widgets for scientific desktop apps: math labels rendered with
+LaTeX/mathtext, dialogs, and parameter inputs (sliders and more).
+
+![Sliders demo](docs/images/sliders_demo.png)
+
 ## Install
 
 ```bash
