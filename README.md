@@ -1,12 +1,7 @@
-# sciwidgets
-
-PySide6 widgets for scientific desktop apps: math labels rendered with
-LaTeX/mathtext, dialogs, and parameter inputs (sliders and more).
-
 ## Install
 
 ```bash
-pip install git+https://github.com/<your-username>/sciwidgets@v0.1.0
+pip install "sciwidgets @ https://github.com/vahid-anari/sciwidgets/archive/refs/tags/v0.1.1.zip"
 ```
 
 For development, from the repo root:
@@ -15,8 +10,22 @@ For development, from the repo root:
 pip install -e .
 ```
 
-## Quick check
+## Use
+
+```python
+from sciwidgets.style import apply_sci_style
+from sciwidgets.labels import MathLabel
+from sciwidgets.params import FloatSlider, ParameterLineEdit
+from sciwidgets.dialogs import ask_question, show_warning
+
+apply_sci_style(app)  # required: the widgets rely on this style
+```
+
+## Demos
 
 ```bash
-python -m sciwidgets.labels.math_label
+python -m sciwidgets.labels
+python -m sciwidgets.dialogs
+python -m sciwidgets.params
+python -m sciwidgets.params.sliders
 ```
