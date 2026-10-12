@@ -6,8 +6,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QComboBox,
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QPlainTextEdit,
     QVBoxLayout,
     QWidget,
@@ -16,6 +18,7 @@ from PySide6.QtWidgets import (
 from sciwidgets.params.sliders.base import SliderFeature
 from sciwidgets.params.sliders.single import ArraySlider, FloatSlider, IntSlider
 from sciwidgets.params.sliders.range import FloatRangeSlider, IntRangeSlider
+from sciwidgets.params.sliders.multi import MultiVariableSlider
 from sciwidgets.style import apply_sci_style
 
 
@@ -134,8 +137,45 @@ def _demo_main() -> int:
     top.addWidget(v_box, 1)
     root.addLayout(top, 1)
 
+    # --- Multi-variable slider ------------------------------------------------
+    tau = MultiVariableSlider(  # one decay time per spectral component
+        label=r"\tau_k", html_label="τ<sub>k</sub>", unit=r"\mathrm{d}",
+        min_val=0.0, max_val=100.0, init_vals=[10, 25, 40, "+inf", 80],
+        val_fmt="{:.1f}", min_limit=0.0,
+    )
+    idx_combo = QComboBox()
+    idx_combo.addItems([str(i) for i in range(tau.get_arr_length())])
+    idx_combo.currentIndexChanged.connect(tau.set_index)
+    same_cb = QCheckBox("Same value for all")
+    same_cb.toggled.connect(tau.set_use_same_values)
+
+    arr_label = QLabel()
+
+    def show_arr(_=None) -> None:
+        """Show the whole array as the slider stores it."""
+        texts = (tau.get_value_text(i) for i in range(tau.get_arr_length()))
+        arr_label.setText("Array: [" + ", ".join(texts) + "]")
+
+    tau.arrayChanged.connect(show_arr)
+    same_cb.toggled.connect(show_arr)
+    show_arr()
+    watch("tau", tau)
+    tau.arrayChanged.connect(lambda a: log.appendPlainText(f"tau: array → {a}"))
+
+    m_box = QGroupBox("Multi-variable")
+    m_col = QVBoxLayout(m_box)
+    m_row = QHBoxLayout()
+    m_row.addWidget(QLabel("Index:"))
+    m_row.addWidget(idx_combo)
+    m_row.addWidget(same_cb)
+    m_row.addStretch(1)
+    m_col.addLayout(m_row)
+    m_col.addWidget(tau)
+    m_col.addWidget(arr_label)
+    root.addWidget(m_box)
+
     # --- Programmatic controls ----------------------------------------------
-    all_sliders = [s for _, s in h_items + v_items]
+    all_sliders = [s for _, s in h_items + v_items] + [tau]
 
     enabled = QCheckBox("Sliders enabled")
     enabled.setChecked(True)
