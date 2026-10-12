@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sciwidgets"
+version = "0.1.0"
+description = "PySide6 widgets for scientific desktop apps"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Vahid" }]
+dependencies = [
+    "PySide6>=6.5,<7",
+    "matplotlib>=3.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.svg", "*.png"]
