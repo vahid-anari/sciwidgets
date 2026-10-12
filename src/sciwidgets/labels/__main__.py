@@ -2,8 +2,8 @@
 
 from PySide6.QtCore import Qt
 
-from . import math_label
-from .math_label import MathLabel
+from sciwidgets.labels import math_label
+from sciwidgets.labels.math_label import MathLabel
 
 
 def _demo_main() -> int:

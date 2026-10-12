@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QPushButton, QStyle, QVBoxLayout, QWidget,
 )
 
-from .message_dialogs import (
+from sciwidgets.dialogs.message_dialogs import (
     ask_question,
     show_about_dialog,
     show_critical,
