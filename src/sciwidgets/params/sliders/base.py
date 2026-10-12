@@ -533,6 +533,7 @@ class SliderWidgetBase(ParameterWidgetBase[T], Generic[T]):
             self._update_value_width()
         finally:
             self.blockSignals(was_blocked)
+        return self._measured_value_width
 
     # ----- Qt events -----
     def contextMenuEvent(self, event) -> None:
