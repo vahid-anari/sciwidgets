@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from sciwidgets.params.sliders.base import SliderFeature
 from sciwidgets.params.sliders.single import ArraySlider, FloatSlider, IntSlider
+from sciwidgets.params.sliders.range import FloatRangeSlider, IntRangeSlider
 from sciwidgets.style import apply_sci_style
 
 
@@ -75,6 +76,18 @@ def _demo_main() -> int:
             label=r"\mathrm{seed}", min_val=0, max_val=99, init_val=42,
             features=SliderFeature.NONE,
         )),
+        ("nu", FloatRangeSlider(  # a frequency band
+            label=r"\nu", unit=r"\mathrm{GHz}", min_val=6.60, max_val=6.75,
+            init_vals=(6.65, 6.70), val_fmt="{:.3f}",
+        )),
+        ("channels", IntRangeSlider(  # integer range
+            label=r"\mathrm{ch}", min_val=0, max_val=1023, init_vals=(100, 900),
+        )),
+        ("I", FloatRangeSlider(  # starts in margins mode, scientific format
+            label="I", unit=r"\mathrm{Jy}", min_val=0.0, max_val=1e3,
+            init_vals=(10.0, 500.0), val_fmt="{:.2S}", min_limit=0.0,
+            use_margins=True, margins=(5, 10),
+        )),
     ]
 
     h_box = QGroupBox("Horizontal")
@@ -106,6 +119,10 @@ def _demo_main() -> int:
         ))
         for axis in "xyz"
     ]
+    v_items.append(("t", FloatRangeSlider(
+        label="t", min_val=0.0, max_val=1.0, init_vals=(0.2, 0.8),
+        val_fmt="{:.2f}", orientation=Qt.Vertical,
+    )))
     v_box = QGroupBox("Vertical")
     v_row = QHBoxLayout(v_box)
     for name, s in v_items:
