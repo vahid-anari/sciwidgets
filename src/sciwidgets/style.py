@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QStyleOptionSlider,
 )
 
-__all__ = ["SciStyle", "widget_style_sheet"]
+__all__ = ["SciStyle", "sci_style_sheet", "apply_sci_style"]
 
 
 class SciStyle(QProxyStyle):
@@ -142,7 +142,7 @@ def _font_rule(selector: str, size: int, family: str, color: Optional[str] = Non
     )
 
 
-def widget_style_sheet(app: QApplication) -> str:
+def sci_style_sheet(app: QApplication) -> str:
     """Return the style-sheet rules the sciwidgets widgets expect.
 
     Sizes are relative to the application's current font, so call this after
@@ -162,3 +162,14 @@ def widget_style_sheet(app: QApplication) -> str:
         + _font_rule("QLineEdit", fs + 1, fm, "blue")
         + _font_rule("QSpinBox", fs + 1, fm, "blue")
     )
+
+def apply_sci_style(app: QApplication, extra_style_sheet: str = "") -> None:
+    """Set SciStyle and the sciwidgets style sheet on ``app``.
+
+    Args:
+        app: Application to style.
+        extra_style_sheet: App-specific rules appended after the
+            sciwidgets rules.
+    """
+    app.setStyle(SciStyle())
+    app.setStyleSheet(sci_style_sheet(app) + extra_style_sheet)

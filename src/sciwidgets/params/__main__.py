@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from sciwidgets.params.numeric_line_edit import NumericLineEdit
-from sciwidgets.style import SciStyle, widget_style_sheet
+from sciwidgets.style import SciStyle, sci_style_sheet
 
 
 def _demo_main() -> int:
@@ -18,7 +18,7 @@ def _demo_main() -> int:
     """
     app = QApplication(sys.argv)
     app.setStyle(SciStyle())
-    app.setStyleSheet(widget_style_sheet(app))
+    app.setStyleSheet(sci_style_sheet(app))
 
     win = QWidget()
     win.setWindowTitle("Params demo")
