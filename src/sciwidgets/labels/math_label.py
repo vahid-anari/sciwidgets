@@ -358,6 +358,7 @@ class MathLabel(QLabel):
         parent = self.parentWidget()
         if parent is not None:
             parent.contextMenuEvent(event)
+            event.accept()
         if not self._editable:
             return
         if not self._menu_items:
