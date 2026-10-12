@@ -14,6 +14,7 @@ __all__ = [
     "get_numeric_format_field",
     "pretty_sci_text",
     "value_to_text",
+    "is_sci_format"
 ]
 
 _SCI_PAT = r"\{:[0-9]*\.(\d+)S\}"
@@ -147,3 +148,14 @@ def value_to_text(value: int | float, fmt: str) -> str:
         return re.sub(_SCI_PAT, repl, fmt)
     except Exception:
         return str(value)
+
+def is_sci_format(fmt: str) -> bool:
+    """Return whether ``fmt`` uses the custom ``S`` scientific marker.
+
+    Args:
+        fmt: Format string to inspect.
+
+    Returns:
+        ``True`` if ``fmt`` contains a field such as ``"{:.3S}"``.
+    """
+    return re.search(_SCI_PAT, fmt) is not None
