@@ -6,8 +6,11 @@ from PySide6.QtWidgets import (
     QApplication, QFormLayout, QLabel, QVBoxLayout, QWidget,
 )
 
+from sciwidgets.params.combo_box import ParameterComboBox
+from sciwidgets.params.line_edit import ParameterLineEdit
 from sciwidgets.params.numeric_line_edit import NumericLineEdit
-from sciwidgets.style import SciStyle, sci_style_sheet
+from sciwidgets.params.toggle import ParameterToggle
+from sciwidgets.style import apply_sci_style
 
 
 def _demo_main() -> int:
@@ -17,8 +20,7 @@ def _demo_main() -> int:
         int: Qt application exit code.
     """
     app = QApplication(sys.argv)
-    app.setStyle(SciStyle())
-    app.setStyleSheet(sci_style_sheet(app))
+    apply_sci_style(app)
 
     win = QWidget()
     win.setWindowTitle("Params demo")
@@ -42,9 +44,35 @@ def _demo_main() -> int:
     form.addRow("Float [-100, ∞):", f_edit)
     form.addRow("Last committed:", committed)
     layout.addLayout(form)
+    # --- Simple parameter widgets ----------------------------------------
+    t_edit = ParameterLineEdit(
+        label="t", init_val=5, val_fmt="{:0.1f}", unit_label=r"\mathrm{s}",
+        min_limit=0.0, min_limit_inclusive=False, parent=win,
+    )
+    n_edit = ParameterLineEdit(label=r"A_\alpha", init_val=5, value_is_int=True, parent=win)
+    unit = ParameterComboBox(
+        label="t", items=["T₀", "d", "h", "m", "S", "ms", "µs", "ns"], parent=win,
+    )
+    unit.set_value("ns")
+    toggle = ParameterToggle(
+        text="Normalize to max",
+        label_on=r"F = I_\mathrm{res} / \max(I_\mathrm{res}) \times I_\mathrm{scale}",
+        label_off=r"F = I_\mathrm{res} \times I_\mathrm{scale}",
+        parent=win,
+    )
+    plain = ParameterToggle(text="Plain checkbox (no labels)", checked=False, parent=win)
+
+    # Align the name column the way a panel would
+    widgets = [t_edit, n_edit, unit, toggle, plain]
+    name_w = max(w.get_name_width() for w in widgets)
+    for w in widgets:
+        w.set_name_width(name_w)
+        w.valueChanged.connect(lambda v, w=w: print(type(w).__name__, v))
+        layout.addWidget(w)
+
     layout.addStretch(1)
 
-    win.resize(340, 160)
+    win.resize(520, 420)
     win.show()
     return app.exec()
 
