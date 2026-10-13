@@ -4,7 +4,7 @@ PySide6 widgets for scientific desktop apps: math labels rendered with
 LaTeX/mathtext, dialogs, and parameter inputs such as sliders, range sliders
 and validated number fields.
 
-![Sliders demo](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.png)
+<img src="https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.png" width="900" alt="Sliders demo">
 
 Right-click menu, Set Value and Edit Configuration:
 
@@ -39,6 +39,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.params` (inputs) | `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit` | [Parameter widgets](https://github.com/vahid-anari/sciwidgets/blob/main/docs/params.md) |
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
+| `sciwidgets.window` | `MenuBarController`, `StatusBarController` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
 | `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
 ## Install
