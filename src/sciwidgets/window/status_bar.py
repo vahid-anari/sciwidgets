@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from enum import Enum
 from time import perf_counter_ns
-from typing import Optional, Union
+from typing import Iterable, Optional, Union
 
 import psutil
 from PySide6.QtCore import QObject, Qt, QTimer
@@ -67,6 +67,7 @@ class StatusBarController(QObject):
             window: QMainWindow,
             *,
             ready_text: str = "Ready",
+            states: Iterable[Union[str, Enum]] = (),
             show_path: bool = True,
             path_label: str = "Path",
             show_memory: bool = True,
@@ -78,6 +79,10 @@ class StatusBarController(QObject):
         Args:
             window: Main window whose status bar is managed.
             ready_text: Initial state text.
+            states: All state texts the app will show. The state label is
+                sized for the widest one, so the path next to it does not
+                move when the state changes. A wider state shown later still
+                fits; the label then grows and keeps that width.
             show_path: Whether to show the document path section.
             path_label: Caption of the path section, e.g. ``"File"``.
             show_memory: Whether to show the process memory.
@@ -105,6 +110,7 @@ class StatusBarController(QObject):
         self._time_lbl = self._fixed_label("0.00 s", 7) if show_time else None
 
         self._make_layout()
+        self._fit_state_width([ready_text, *states])
         self._update_path_label()
         self._update_memory()
 
@@ -183,6 +189,18 @@ class StatusBarController(QObject):
         self._path_lbl.setText(text)
         self._path_lbl.setToolTip(text)
 
+    @staticmethod
+    def _state_text(state: Union[str, Enum]) -> str:
+        """Return the display text of a state (an enum's value, or the string)."""
+        return state.value if isinstance(state, Enum) else str(state)
+
+    def _fit_state_width(self, states: Iterable[Union[str, Enum]]) -> None:
+        """Widen the state label to fit the given states; it never shrinks."""
+        fm = self._state_lbl.fontMetrics()
+        width = max((fm.horizontalAdvance(self._state_text(s)) for s in states), default=0) + 4
+        if width > self._state_lbl.minimumWidth():
+            self._state_lbl.setMinimumWidth(width)
+
     # ----- public API -----
     def set_state(self, state: Union[str, Enum], busy: bool = False) -> None:
         """Show a new state.
@@ -202,13 +220,12 @@ class StatusBarController(QObject):
         self._busy = bool(busy)
         if self._busy:
             self._start_ns = perf_counter_ns()
-            self._update_time()
             self._timer.start()
 
         self._update_memory()
-        text = state.value if isinstance(state, Enum) else str(state)
+        text = self._state_text(state)
+        self._fit_state_width([text])
         self._state_lbl.setText(text)
-
 
     def is_busy(self) -> bool:
         """Return whether a busy state is active."""

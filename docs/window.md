@@ -156,6 +156,7 @@ QTimer.singleShot(50, import_data)   # import_data ends with status.set_state("R
 | Argument | Default | Meaning |
 |----------|---------|---------|
 | `ready_text` | `"Ready"` | initial state text |
+| `states` | `()` | all state texts you will use; the label is sized for the widest, so the path does not move |
 | `show_path` | `True` | show the path section |
 | `path_label` | `"Path"` | caption of the path section, e.g. `"File"` |
 | `show_memory` | `True` | show the memory use |
