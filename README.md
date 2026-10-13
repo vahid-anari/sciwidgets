@@ -44,7 +44,7 @@ and moved into this package so other apps can share them.
 ## Install
 
 ```bash
-pip install "sciwidgets @ https://github.com/vahid-anari/sciwidgets/archive/refs/tags/v0.1.1.zip"
+pip install sciwidgets
 ```
 
 Requires Python 3.10+, PySide6 6.5+, Matplotlib and NumPy (installed
