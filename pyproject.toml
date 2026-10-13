@@ -1,22 +1,45 @@
 [build-system]
-requires = ["setuptools>=64"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "sciwidgets"
 version = "0.1.1"
-description = "PySide6 widgets for scientific desktop apps"
+description = "PySide6 widgets for scientific desktop apps: math labels, sliders, parameter inputs and dialogs"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [{ name = "Vahid" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Vahid Anari", email = "vahid.anari8@gmail.com" }]
+keywords = [
+    "pyside6", "qt", "gui", "widgets", "scientific",
+    "slider", "range-slider", "latex", "matplotlib", "dialogs",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: User Interfaces",
+]
 dependencies = [
     "PySide6>=6.5,<7",
     "matplotlib>=3.7",
     "numpy>=1.24",
 ]
 
+[project.optional-dependencies]
+dev = ["build", "twine"]
+
 [project.urls]
+Homepage = "https://github.com/vahid-anari/sciwidgets"
 Repository = "https://github.com/vahid-anari/sciwidgets"
+Issues = "https://github.com/vahid-anari/sciwidgets/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
