@@ -4,11 +4,11 @@ PySide6 widgets for scientific desktop apps: math labels rendered with
 LaTeX/mathtext, dialogs, and parameter inputs such as sliders, range sliders
 and validated number fields.
 
-![Sliders demo](docs/images/sliders_demo.png)
+![Sliders demo](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.png)
 
 Right-click menu, Set Value and Edit Configuration:
 
-![Slider interaction](docs/images/sliders_demo.gif)
+![Slider interaction](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.gif)
 
 The widgets were written for the
 [Maxwell Bloch Solver](https://github.com/vahid-anari/maxwell-bloch-solver)
@@ -30,6 +30,16 @@ and moved into this package so other apps can share them.
   name/value columns that line up across a panel.
 - **Dialogs**: information, warning, error, question, rich-text and About
   dialogs.
+
+## Components
+
+| Import | Contents |
+|--------|----------|
+| `sciwidgets.labels` | `MathLabel` (LaTeX/mathtext label), `set_latex_enabled` |
+| `sciwidgets.params` | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit`, `SliderFeature` |
+| `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question`, `AskResult` |
+| `sciwidgets.style` | `SciStyle`, `apply_sci_style`, `sci_style_sheet` |
+| `sciwidgets.formatting` | `pretty_sci_text`, `value_to_text` and other format helpers |
 
 ## Install
 
@@ -120,3 +130,13 @@ python -m sciwidgets.params.sliders
 Releases are Git tags following [semantic versioning](https://semver.org).
 Pin an exact tag in your app's requirements, as in the install line above,
 and move to a newer tag when you are ready to test it.
+
+## License
+
+MIT License. See [LICENSE](https://github.com/vahid-anari/sciwidgets/blob/main/LICENSE).
+
+## Author
+
+Vahid Anari ·
+[GitHub](https://github.com/vahid-anari) ·
+[LinkedIn](https://www.linkedin.com/in/vahid-anari/)
