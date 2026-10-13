@@ -33,13 +33,13 @@ and moved into this package so other apps can share them.
 
 ## Components
 
-| Import | Contents |
-|--------|----------|
-| `sciwidgets.labels` | `MathLabel` (LaTeX/mathtext label), `set_latex_enabled` |
-| `sciwidgets.params` | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit`, `SliderFeature` |
-| `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question`, `AskResult` |
-| `sciwidgets.style` | `SciStyle`, `apply_sci_style`, `sci_style_sheet` |
-| `sciwidgets.formatting` | `pretty_sci_text`, `value_to_text` and other format helpers |
+| Import | Contents | Docs |
+|--------|----------|------|
+| `sciwidgets.params` (sliders) | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `SliderFeature` | [Sliders](https://github.com/vahid-anari/sciwidgets/blob/main/docs/sliders.md) |
+| `sciwidgets.params` (inputs) | `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit` | [Parameter widgets](https://github.com/vahid-anari/sciwidgets/blob/main/docs/params.md) |
+| `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
+| `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
+| `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
 ## Install
 
