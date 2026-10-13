@@ -4,7 +4,7 @@ Labeled sliders for numeric parameters: a LaTeX name on the left, the slider in
 the middle, the current value and unit on the right, and optional range labels
 underneath. All of them are imported from `sciwidgets.params`.
 
-![Sliders demo](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.png)
+<img src="images/sliders_demo.png" width="900" alt="Sliders demo">
 
 | Slider | Value | Use it for |
 |--------|-------|------------|

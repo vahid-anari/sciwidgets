@@ -72,7 +72,7 @@ def _demo_main() -> int:
 
     layout.addStretch(1)
 
-    win.resize(520, 420)
+    win.adjustSize()
     win.show()
     return app.exec()
 

@@ -9,7 +9,7 @@ from sciwidgets.labels import MathLabel
 
 label = MathLabel(r"\Omega_{\mathrm{R}} = \frac{d\,E}{\hbar}", font_size=18)
 ```
-
+<img src="images/labels_demo.png" width="565" alt="MathLabel demo: LaTeX (left) and mathtext (right)">
 Run `python -m sciwidgets.labels` to see examples and try your own
 expressions.
 
