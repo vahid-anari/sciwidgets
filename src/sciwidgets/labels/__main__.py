@@ -115,7 +115,7 @@ def _demo_main() -> int:
     render()
     root.addWidget(box)
 
-    win.resize(520, 560)
+    win.adjustSize()
     win.show()
     return app.exec()
 
