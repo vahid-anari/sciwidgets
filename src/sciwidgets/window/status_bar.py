@@ -188,9 +188,9 @@ class StatusBarController(QObject):
         """Show a new state.
 
         A busy state starts the elapsed-time clock; any following state stops
-        it and keeps the final time on display. The label is repainted at
-        once, so the new state is visible even if a long computation starts
-        right after this call.
+        it and keeps the final time on display. The new state appears when
+        control returns to the event loop, so run long tasks in a worker
+        thread, or start them with ``QTimer.singleShot`` after this call.
 
         Args:
             state: Text to show, or an enum whose value is the text.
@@ -208,9 +208,7 @@ class StatusBarController(QObject):
         self._update_memory()
         text = state.value if isinstance(state, Enum) else str(state)
         self._state_lbl.setText(text)
-        self._state_lbl.repaint()
-        if self._time_lbl is not None:
-            self._time_lbl.repaint()
+
 
     def is_busy(self) -> bool:
         """Return whether a busy state is active."""
