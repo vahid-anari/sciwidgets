@@ -831,17 +831,13 @@ class LabeledRangeSliderBase(SliderWidgetBase[Any], Generic[TNum]):
         return self._value_wrap
 
     def _align_value_labels(self, horizontal: bool) -> None:
-        """Align the five value labels for the orientation.
+        """Align the five value labels; numbers are right-aligned in their slots.
 
         Args:
             horizontal: Whether the layout is horizontal.
         """
-        if horizontal:
-            fixed = Qt.AlignVCenter
-            value = Qt.AlignVCenter | Qt.AlignLeft
-        else:
-            fixed = Qt.AlignHCenter | Qt.AlignVCenter
-            value = Qt.AlignLeft | Qt.AlignVCenter
+        fixed = Qt.AlignVCenter if horizontal else Qt.AlignHCenter | Qt.AlignVCenter
+        value = Qt.AlignRight | Qt.AlignVCenter
         for label in (self._value_l_label, self._value_c_label, self._value_r_label):
             label.setAlignment(fixed)
         for label in (self._value_lo_label, self._value_hi_label):
