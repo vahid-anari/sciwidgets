@@ -483,14 +483,22 @@ class PlotCanvas(FigureCanvasQTAgg):
         """Draw the remembered grid; value-axis grid lines take the primary colour."""
         value_dir = "x" if axis.twin_axis == "y" else "y"
         color = self._primary_color(axis)
-        for (direction, which), on in axis.grid.items():
-            if on and not (axis.select_one and axis.primary is None and direction == value_dir):
-                props = dict(axis.value_grid_props if direction == value_dir else axis.grid_props)
-                if direction == value_dir and color is not None:
-                    props.setdefault("color", color)
-                axis.ax.grid(True, which=which, axis=direction, **props)
-            else:
-                axis.ax.grid(False, which=which, axis=direction)
+        for direction in ("x", "y"):  # every combination, so that cleared ones are switched off too
+            for which in ("major", "minor"):
+                self._draw_grid(axis, direction, which, axis.grid.get((direction, which), False),
+                                value_dir, color)
+
+    @staticmethod
+    def _draw_grid(axis: _Axis, direction: str, which: str, on: bool, value_dir: str,
+                   color: Optional[str]) -> None:
+        """Show or hide one set of grid lines of an axes."""
+        if on and not (axis.select_one and axis.primary is None and direction == value_dir):
+            props = dict(axis.value_grid_props if direction == value_dir else axis.grid_props)
+            if direction == value_dir and color is not None:
+                props.setdefault("color", color)
+            axis.ax.grid(True, which=which, axis=direction, **props)
+        else:
+            axis.ax.grid(False, which=which, axis=direction)
 
     def _update_legend(self, panel_id: str) -> None:
         """Rebuild a panel's legend from the visible labelled curves of the panel and its twin."""
