@@ -7,7 +7,7 @@ import numpy as np
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
-    QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QPlainTextEdit,
@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from sciwidgets.plot import PlotCanvas
+from sciwidgets.plot import CurveCheckBox, CurveSelector, PlotCanvas
 from sciwidgets.style import apply_sci_style
 
 # Plain JSON, as it would come from a settings file
@@ -101,19 +101,15 @@ def _demo_main() -> int:
         canvas.axes(axis_id).relim(visible_only=True)
         canvas.axes(axis_id).autoscale_view()
 
-    profile = QComboBox()
-    profile.addItem("Λₙ", "lambda")
-    profile.addItem("T₁", "t1")
-    profile.addItem("none", None)
-    def on_profile() -> None:
-        canvas.select_curve("profiles", profile.currentData())
+    profile = CurveSelector(canvas, "profiles", none_text="none")
+
+    def rescale_profile(_curve_id) -> None:
         canvas.axes("profiles").relim(visible_only=True)
         canvas.axes("profiles").autoscale_view(scalex=False)
         canvas.redraw()
-    profile.currentIndexChanged.connect(on_profile)
+    profile.curveSelected.connect(rescale_profile)
 
-    show_w = QCheckBox("Show w", checked=True)
-    show_w.toggled.connect(lambda on: (canvas.set_axis_visible("profiles.twin", on), canvas.redraw()))
+    show_w = CurveCheckBox(canvas, "w", axis="profiles.twin")
 
     show_fit = QCheckBox("Show fit", checked=True)
     show_fit.toggled.connect(lambda on: (canvas.set_curve_visible("fit", on), canvas.redraw()))
@@ -157,10 +153,18 @@ def _demo_main() -> int:
     save.clicked.connect(lambda: (saved.update(cfg=canvas.get_config()), log.setPlainText(f"saved: {saved['cfg']}")))
     restore = QPushButton("Restore saved")
     restore.clicked.connect(lambda: (canvas.set_config(saved.get("cfg", {})), canvas.redraw()))
+    export = QPushButton("Export…")
+
+    def do_export() -> None:
+        path, _ = QFileDialog.getSaveFileName(win, "Export plot", "plot.pdf",
+                                              "PDF (*.pdf);;PNG (*.png);;SVG (*.svg)")
+        if path:
+            canvas.export(path)
+    export.clicked.connect(do_export)
     reset = QPushButton("Reset all")
     reset.clicked.connect(lambda: (canvas.reset_config(), canvas.redraw()))
     config_row = QHBoxLayout()
-    for b in (save, restore, reset):
+    for b in (save, restore, reset, export):
         config_row.addWidget(b)
     config_row.addWidget(log, 1)
 

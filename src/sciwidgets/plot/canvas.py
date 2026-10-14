@@ -83,6 +83,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import QDialog, QMenu, QWidget
 
+from ._icons import color_icon
 from ._style_dialog import CurveStyleDialog
 
 __all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text"]
@@ -203,9 +204,12 @@ class PlotCanvas(FigureCanvasQTAgg):
         configChanged (object): The user changed a style, a curve's
             visibility, a grid or a legend through the right-click menu;
             sends ``get_config()``.
+        curveStyleChanged (str): A curve's style changed, by the user or by
+            code; sends the curve id (used to keep colour swatches current).
     """
 
     configChanged = Signal(object)
+    curveStyleChanged = Signal(str)
 
     def __init__(
             self,
@@ -578,6 +582,7 @@ class PlotCanvas(FigureCanvasQTAgg):
         if axis.primary == curve_id:
             self._refresh_axis(axis)
         self._update_legend(axis.panel_id)
+        self.curveStyleChanged.emit(curve_id)
 
     def get_curve_style(self, curve_id: str) -> Dict[str, Any]:
         """Return a curve's colour, line style and width, marker and marker size."""
@@ -589,6 +594,10 @@ class PlotCanvas(FigureCanvasQTAgg):
             "marker": line.get_marker(),
             "markersize": float(line.get_markersize()),
         }
+
+    def get_curve_name(self, curve_id: str) -> str:
+        """Return a curve's plain-text name (for menus and selectors)."""
+        return self._curve(curve_id).name
 
     def get_curve_label(self, curve_id: str) -> Tuple[str, str]:
         """Return a curve's ``(label, unit)`` math text."""
@@ -862,7 +871,9 @@ class PlotCanvas(FigureCanvasQTAgg):
             return act
 
         if under is not None:
-            action(f"Style of {under.name}…", lambda: self._edit_style(under.id))
+            act = action(f"Style of {under.name}…", lambda: self._edit_style(under.id))
+            act.setIcon(color_icon(self.get_curve_style(under.id)["color"]))
+            act.setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
             menu.addSeparator()
 
         for axis in group:
@@ -870,7 +881,8 @@ class PlotCanvas(FigureCanvasQTAgg):
                 continue
             sub = menu.addMenu("Curves (right axis)" if axis.twin_of and len(group) > 1 else "Curves")
             for cid, curve in axis.curves.items():
-                item = sub.addMenu(curve.name)
+                item = sub.addMenu(color_icon(self.get_curve_style(cid)["color"]), curve.name)
+                item.menuAction().setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
                 action("Style…", lambda _=False, c=cid: self._edit_style(c), parent=item)
                 if not axis.select_one:
                     def toggle(on: bool, c: str = cid) -> None:
@@ -915,6 +927,20 @@ class PlotCanvas(FigureCanvasQTAgg):
             self._user_changed()
         action("Reset this panel", reset_panel)
         return menu
+
+    def export(self, path: str, *, dpi: Optional[float] = None, pad_inches: float = 0.1,
+               **kwargs: Any) -> None:
+        """Save the figure to a file; the format follows the extension (pdf, png, svg, ...).
+
+        Args:
+            path: Output file.
+            dpi: Resolution for bitmap formats (default: the figure's).
+            pad_inches: Margin around the tight bounding box.
+            **kwargs: Further ``Figure.savefig`` arguments.
+        """
+        kwargs.setdefault("bbox_inches", "tight")
+        kwargs.setdefault("facecolor", self.figure.get_facecolor())
+        self.figure.savefig(path, dpi=dpi or self.figure.dpi, pad_inches=pad_inches, **kwargs)
 
     def redraw(self) -> None:
         """Schedule a redraw (cheap to call often)."""
