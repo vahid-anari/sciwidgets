@@ -9,7 +9,9 @@ The description lists the tabs; each has an ``"id"``, a ``"title"`` and a
     ]}
 
 Widget paths are unique across all tabs, so values and configurations of
-the whole panel are one flat dict.
+the whole panel are one flat dict. Next to ``"tabs"``, the description may
+have ``"templates"`` and panel-wide ``"defaults"``; see
+:mod:`sciwidgets.panel.expand`.
 """
 
 from __future__ import annotations
@@ -21,11 +23,13 @@ from PySide6.QtWidgets import QTabWidget, QWidget
 
 from sciwidgets.params import ParameterWidgetBase
 
+from .expand import expand_layouts
 from .page import ParameterPage
 
 __all__ = ["ParameterTabs"]
 
 _TAB_KEYS = frozenset({"id", "title", "layout"})
+_TOP_KEYS = frozenset({"tabs", "templates", "defaults"})
 
 
 class ParameterTabs(QTabWidget):
@@ -48,7 +52,8 @@ class ParameterTabs(QTabWidget):
         """Build one page per tab.
 
         Args:
-            description: Mapping with a ``"tabs"`` list.
+            description: Mapping with a ``"tabs"`` list and, optionally,
+                ``"templates"`` and ``"defaults"``.
             parent: Parent widget.
 
         Raises:
@@ -59,10 +64,14 @@ class ParameterTabs(QTabWidget):
         self._pages: Dict[str, ParameterPage] = {}
         self._page_of_path: Dict[str, ParameterPage] = {}
 
+        unknown = set(description) - _TOP_KEYS
+        if unknown:
+            raise ValueError(f"description: unknown key(s) {sorted(unknown)}")
         tabs = description.get("tabs")
         if not isinstance(tabs, list):
             raise ValueError("description needs a 'tabs' list")
 
+        checked = []
         for i, tab in enumerate(tabs):
             where = f"tabs[{i}]"
             if not isinstance(tab, Mapping):
@@ -73,13 +82,22 @@ class ParameterTabs(QTabWidget):
             tab_id = tab.get("id")
             if not tab_id:
                 raise ValueError(f"{where}: tab has no 'id'")
-            if tab_id in self._pages:
-                raise ValueError(f"{where}: tab id {tab_id!r} is used twice")
             if "layout" not in tab:
                 raise ValueError(f"{where}: tab {tab_id!r} has no 'layout'")
+            if any(t["id"] == tab_id for t in checked):
+                raise ValueError(f"{where}: tab id {tab_id!r} is used twice")
+            checked.append(tab)
 
+        layouts = expand_layouts(
+            [(f"tab {t['id']!r}: layout", t["layout"]) for t in checked],
+            description.get("templates"),
+            description.get("defaults"),
+        )
+
+        for tab, layout in zip(checked, layouts):
+            tab_id = tab["id"]
             try:
-                page = ParameterPage(tab["layout"])
+                page = ParameterPage(layout)
             except (ValueError, TypeError) as exc:
                 raise type(exc)(f"tab {tab_id!r}: {exc}") from exc
             for path in page.paths():

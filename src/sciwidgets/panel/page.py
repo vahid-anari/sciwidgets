@@ -23,6 +23,9 @@ Items:
 * ``{"group": "Title", "column": [...]}`` (or ``"row"``) draws a titled box.
 * ``{"stretch": n}`` alone is empty space that takes a share ``n`` of the
   free room; on any other item it sets that item's share.
+
+Containers may also have ``"defaults"``, and widgets may use
+``"template"``; see :mod:`sciwidgets.panel.expand`.
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ from PySide6.QtWidgets import (
 
 from sciwidgets.params import ParameterWidgetBase
 
+from .expand import expand_layout
 from .factory import widget_from_spec
 
 __all__ = ["ParameterPage"]
@@ -69,13 +73,22 @@ class ParameterPage(QWidget):
     valueChanged = Signal(str, object)
     configChanged = Signal(str, object)
 
-    def __init__(self, layout: Mapping[str, Any], parent: Optional[QWidget] = None) -> None:
+    def __init__(
+            self,
+            layout: Mapping[str, Any],
+            parent: Optional[QWidget] = None,
+            *,
+            templates: Optional[Mapping[str, Any]] = None,
+            defaults: Optional[Mapping[str, Any]] = None,
+    ) -> None:
         """Build the page.
 
         Args:
             layout: Layout description; its top item is usually a
                 ``"column"``.
             parent: Parent widget.
+            templates: Named widget descriptions usable with ``"template"``.
+            defaults: Defaults for every widget on the page.
 
         Raises:
             ValueError: If an item is malformed, a widget has no ``"path"``,
@@ -89,7 +102,7 @@ class ParameterPage(QWidget):
 
         content = QWidget()
         outer = QVBoxLayout(content)
-        self._add_item(outer, layout, where="layout")
+        self._add_item(outer, expand_layout(layout, templates, defaults), where="layout")
         outer.addStretch(1)
 
         scroll = QScrollArea(self)

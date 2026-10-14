@@ -32,9 +32,16 @@ DESCRIPTION = json.loads(r"""
       {"type": "toggle", "path": "solve.normalize", "text": "Normalize", "checked": true},
       {"stretch": 1}]}]}},
   {"id": "display", "title": "Display", "layout": {"column": [
-    {"type": "range-slider", "path": "display.window", "label": "t_\\mathrm{window}",
-     "min_val": 0, "max_val": 100, "init_vals": [10, 60], "val_fmt": "{:.1f}"}]}}
-]}
+    {"group": "Windows (one template, defaults for the group)", "defaults": {"show_range": false},
+     "column": [
+      {"template": "window", "path": "display.t", "label": "t"},
+      {"template": "window", "path": "display.f", "label": "F", "unit": "\\mathrm{Jy}",
+       "max_val": 50, "init_vals": [0, 25]}]}]}}
+],
+"templates": {
+  "window": {"type": "range-slider", "min_val": 0, "max_val": 100, "init_vals": [10, 60],
+             "val_fmt": "{:.1f}"}
+}}
 """)
 
 

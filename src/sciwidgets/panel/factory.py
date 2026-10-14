@@ -12,7 +12,8 @@ with :func:`register_type`.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, Optional, Type
+import inspect
+from typing import Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Type
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
@@ -31,7 +32,7 @@ from sciwidgets.params import (
     SliderFeature,
 )
 
-__all__ = ["RESERVED_KEYS", "register_type", "widget_from_spec", "widget_types"]
+__all__ = ["RESERVED_KEYS", "accepted_args", "register_type", "widget_from_spec", "widget_types"]
 
 RESERVED_KEYS = frozenset({"type", "path", "stretch"})
 """Keys used by the panel itself; they are never passed to a constructor."""
@@ -101,6 +102,25 @@ def register_type(name: str, cls: Type[ParameterWidgetBase], *, replace: bool = 
 def widget_types() -> List[str]:
     """Return the registered type names, sorted."""
     return sorted(_TYPES)
+
+
+def accepted_args(type_name: str) -> Optional[FrozenSet[str]]:
+    """Return the argument names a type's constructor accepts.
+
+    Args:
+        type_name: Registered type name.
+
+    Returns:
+        The names (without ``self`` and ``parent``), or ``None`` if the type
+        is unknown or its constructor takes ``**kwargs`` (accepts anything).
+    """
+    cls = _TYPES.get(type_name)
+    if cls is None:
+        return None
+    params = inspect.signature(cls.__init__).parameters.values()
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params):
+        return None
+    return frozenset(p.name for p in params if p.name not in ("self", "parent"))
 
 
 def widget_from_spec(spec: Mapping[str, Any], parent: Optional[QWidget] = None) -> ParameterWidgetBase:
