@@ -32,16 +32,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterator, List, Mapping, Optional, Tuple
 
-from PySide6.QtCore import QEvent, QObject, QSize, Signal
-from PySide6.QtWidgets import (
-    QBoxLayout,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QScrollArea,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QBoxLayout, QGroupBox, QHBoxLayout, QVBoxLayout, QWidget
 
 from sciwidgets.params import ParameterWidgetBase
 
@@ -58,7 +50,8 @@ class ParameterPage(QWidget):
 
     Values and configurations of the whole page are read and written as flat
     dicts keyed by widget path. The page is top-aligned: free space collects
-    at the bottom, and a scroll bar appears when the window is too small.
+    at the bottom. It never scrolls: its minimum size is what its widgets
+    need, so every parameter is always visible.
 
     Signals:
         valueChanged (str, object): The user changed a widget's value; sends
@@ -100,41 +93,12 @@ class ParameterPage(QWidget):
         self._widgets: Dict[str, ParameterWidgetBase] = {}
         self._columns: List[List[ParameterWidgetBase]] = []
 
-        content = QWidget()
-        outer = QVBoxLayout(content)
+        outer = QVBoxLayout(self)
         self._add_item(outer, expand_layout(layout, templates, defaults), where="layout")
         outer.addStretch(1)
 
-        self._content = content
-        scroll = QScrollArea(self)
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setWidget(content)
-        # Let the tab page (or whatever holds the page) show through
-        scroll.viewport().setAutoFillBackground(False)
-        content.setAutoFillBackground(False)
-        content.installEventFilter(self)
-        box = QVBoxLayout(self)
-        box.setContentsMargins(0, 0, 0, 0)
-        box.addWidget(scroll)
-
         for column in self._columns:
             self._connect_alignment(column)
-
-    def sizeHint(self) -> QSize:
-        """Prefer the size that shows every widget without a scroll bar.
-
-        A plain scroll area prefers a small size; this lets layouts give the
-        page the room its widgets need, and the scroll bar only appears when
-        the window is made smaller than that.
-        """
-        return self._content.sizeHint()
-
-    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
-        """Pass size changes of the content on (e.g. a widget was hidden)."""
-        if obj is self._content and event.type() == QEvent.LayoutRequest:
-            self.updateGeometry()
-        return super().eventFilter(obj, event)
 
     # ----- construction -----
     def _add_item(self, parent: QBoxLayout, item: Mapping[str, Any], where: str,

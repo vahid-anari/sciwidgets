@@ -28,6 +28,9 @@ and moved into this package so other apps can share them.
 - **Parameter widgets**: line edit, combo box and toggle sharing one interface
   with the sliders (`get_value` / `set_value`, `get_config` / `set_config`) and
   name/value columns that line up across a panel.
+- **Parameter panels**: build groups, columns and tabs of parameter widgets
+  from a JSON-style description, with templates and shared defaults, and read
+  or restore all values as one dict.
 - **Dialogs**: information, warning, error, question, rich-text and About
   dialogs.
 
@@ -37,6 +40,7 @@ and moved into this package so other apps can share them.
 |--------|----------|------|
 | `sciwidgets.params` (sliders) | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `SliderFeature` | [Sliders](https://github.com/vahid-anari/sciwidgets/blob/main/docs/sliders.md) |
 | `sciwidgets.params` (inputs) | `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit` | [Parameter widgets](https://github.com/vahid-anari/sciwidgets/blob/main/docs/params.md) |
+| `sciwidgets.panel` | `ParameterPage`, `ParameterTabs`, `widget_from_spec`, `register_type` | [Parameter panels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/panel.md) |
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
