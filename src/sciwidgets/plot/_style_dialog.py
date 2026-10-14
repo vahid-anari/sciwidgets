@@ -108,3 +108,56 @@ class CurveStyleDialog(QDialog):
             "marker": self._marker.currentData(),
             "markersize": float(self._msize.value()),
         }
+
+
+class GridStyleDialog(QDialog):
+    """Edit line style, width and opacity of all grid lines (colours stay automatic).
+
+    "Reset" restores the style from the plot description.
+    """
+
+    def __init__(self, style: Dict[str, Any], default: Dict[str, Any],
+                 parent: Optional[QWidget] = None) -> None:
+        """Build the dialog.
+
+        Args:
+            style: Current grid style (``linestyle``, ``linewidth``, ``alpha``).
+            default: Style from the description, used by "Reset".
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Grid style")
+        self._default = dict(default)
+
+        self._line = QComboBox()
+        for label, value in LINE_STYLES.items():
+            if value != "None":
+                self._line.addItem(label, value)
+        self._width = QDoubleSpinBox(minimum=0.1, maximum=5.0, singleStep=0.1, decimals=2)
+        self._alpha = QDoubleSpinBox(minimum=0.05, maximum=1.0, singleStep=0.05, decimals=2)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.Reset).clicked.connect(lambda: self._show(self._default))
+
+        form = QFormLayout(self)
+        form.addRow("Line:", self._line)
+        form.addRow("Line width:", self._width)
+        form.addRow("Opacity:", self._alpha)
+        form.addRow(buttons)
+        self._show(style)
+
+    def _show(self, style: Dict[str, Any]) -> None:
+        """Put a style into the editors."""
+        _pick(self._line, {k: v for k, v in LINE_STYLES.items() if v != "None"}, style["linestyle"])
+        self._width.setValue(style["linewidth"])
+        self._alpha.setValue(style["alpha"])
+
+    def style(self) -> Dict[str, Any]:
+        """Return the edited style."""
+        return {
+            "linestyle": self._line.currentData(),
+            "linewidth": float(self._width.value()),
+            "alpha": float(self._alpha.value()),
+        }

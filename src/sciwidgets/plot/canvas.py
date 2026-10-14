@@ -74,6 +74,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+import matplotlib as mpl
 import matplotlib.colors as mcolors
 from matplotlib.axes import Axes
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -85,7 +86,7 @@ from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import QDialog, QMenu, QWidget
 
 from ._icons import color_icon
-from ._style_dialog import CurveStyleDialog
+from ._style_dialog import CurveStyleDialog, GridStyleDialog
 
 __all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text"]
 
@@ -122,6 +123,7 @@ _PANEL_KEYS = frozenset({"curves", "x", "y", "primary", "select", "zero_line", "
 _TWIN_KEYS = frozenset({"axis", "curves", "x", "y", "primary", "select", "zero_line", "grid"})
 _CURVE_KEYS = frozenset({"label", "unit", "legend", "name", "style", "props"})
 _STYLE_KEYS = ("color", "linestyle", "linewidth", "marker", "markersize")
+_GRID_STYLE_KEYS = ("linestyle", "linewidth", "alpha")
 _GRID_KEYS = {("y", "major"): "y_major", ("y", "minor"): "y_minor",
               ("x", "major"): "x_major", ("x", "minor"): "x_minor"}
 _MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "props"})
@@ -252,6 +254,7 @@ class PlotCanvas(FigureCanvasQTAgg):
         self._legends: Dict[str, Dict[str, Any]] = {}
         self._legend_on: Dict[str, bool] = {}
         self._markers: Dict[str, _Marker] = {}
+        self._grid_style: Dict[str, Any] = {}  # user's grid style; overrides the description
 
         fig_spec = dict(description.get("figure", {}))
         margins = fig_spec.pop("margins", None)
@@ -488,14 +491,18 @@ class PlotCanvas(FigureCanvasQTAgg):
                 self._draw_grid(axis, direction, which, axis.grid.get((direction, which), False),
                                 value_dir, color)
 
-    @staticmethod
-    def _draw_grid(axis: _Axis, direction: str, which: str, on: bool, value_dir: str,
+    def _draw_grid(self, axis: _Axis, direction: str, which: str, on: bool, value_dir: str,
                    color: Optional[str]) -> None:
         """Show or hide one set of grid lines of an axes."""
         if on and not (axis.select_one and axis.primary is None and direction == value_dir):
-            props = dict(axis.value_grid_props if direction == value_dir else axis.grid_props)
-            if direction == value_dir and color is not None:
-                props.setdefault("color", color)
+            own = axis.value_grid_props if direction == value_dir else axis.grid_props
+            rc = mpl.rcParams
+            # Pass every property each time: Matplotlib keeps earlier grid settings otherwise
+            props = {"linestyle": rc["grid.linestyle"], "linewidth": rc["grid.linewidth"],
+                     "alpha": rc["grid.alpha"], "color": rc["grid.color"],
+                     **own, **self._grid_style}
+            if direction == value_dir and color is not None and "color" not in own:
+                props["color"] = color
             axis.ax.grid(True, which=which, axis=direction, **props)
         else:
             axis.ax.grid(False, which=which, axis=direction)
@@ -806,6 +813,33 @@ class PlotCanvas(FigureCanvasQTAgg):
         """Return the ids of all markers."""
         return list(self._markers)
 
+    def default_grid_style(self) -> Dict[str, Any]:
+        """Return the grid line style from the description (horizontal lines of a panel)."""
+        value = _merge(self._axes_style["grid"], self._axes_style["grid_value"])
+        return {
+            "linestyle": value.get("linestyle", value.get("ls", "-")),
+            "linewidth": float(value.get("linewidth", value.get("lw", mpl.rcParams["grid.linewidth"]))),
+            "alpha": float(value.get("alpha", 1.0)),
+        }
+
+    def get_grid_style(self) -> Dict[str, Any]:
+        """Return the grid line style in use (``linestyle``, ``linewidth``, ``alpha``)."""
+        return {**self.default_grid_style(), **self._grid_style}
+
+    def set_grid_style(self, **props: Any) -> None:
+        """Set the style of all grid lines: ``linestyle``, ``linewidth``, ``alpha``.
+
+        Colours stay automatic. Values equal to the description's are dropped,
+        so ``get_config`` only reports real changes. No arguments resets it.
+        """
+        unknown = set(props) - set(_GRID_STYLE_KEYS)
+        if unknown:
+            raise ValueError(f"grid style: unknown key(s) {sorted(unknown)}; allowed: {', '.join(_GRID_STYLE_KEYS)}")
+        default = self.default_grid_style()
+        self._grid_style = {k: v for k, v in props.items() if v != default[k]}
+        for axis in self._axes.values():
+            self._apply_grid(axis)
+
     # ----- user configuration -----
     def get_config(self) -> Dict[str, Any]:
         """Return what differs from the description, as plain JSON data.
@@ -815,7 +849,8 @@ class PlotCanvas(FigureCanvasQTAgg):
 
             {"curves": {"flux": {"color": "#d62728", "linewidth": 2.0},
                         "fit": {"visible": False}},
-             "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}}}
+             "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}},
+             "grid_style": {"linestyle": ":", "alpha": 0.5}}
         """
         curves: Dict[str, Dict[str, Any]] = {}
         for cid, curve in self._curves.items():
@@ -837,6 +872,8 @@ class PlotCanvas(FigureCanvasQTAgg):
             out["curves"] = curves
         if axes:
             out["axes"] = axes
+        if self._grid_style:
+            out["grid_style"] = dict(self._grid_style)
         return out
 
     def set_config(self, config: Mapping[str, Any]) -> None:
@@ -854,6 +891,9 @@ class PlotCanvas(FigureCanvasQTAgg):
                 self.set_curve_style(cid, **style)
             if "visible" in diff and not self._axes[self._curves[cid].axis_id].select_one:
                 self.set_curve_visible(cid, bool(diff["visible"]))
+        grid_style = {k: v for k, v in dict(config.get("grid_style", {})).items() if k in _GRID_STYLE_KEYS}
+        if grid_style:
+            self.set_grid_style(**grid_style)
         reverse = {v: k for k, v in _GRID_KEYS.items()}
         for axis_id, diff in dict(config.get("axes", {})).items():
             if axis_id not in self._axes:
@@ -871,6 +911,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             self.set_curve_style(cid, **self._default_styles[cid])
             if not self._axes[curve.axis_id].select_one:
                 self.set_curve_visible(cid, self._default_visible[cid])
+        self._grid_style = {}
         for axis_id, axis in self._axes.items():
             axis.grid.clear()
             self._apply_grid(axis)
@@ -903,6 +944,13 @@ class PlotCanvas(FigureCanvasQTAgg):
                                   self._default_styles[curve_id], self)
         if dialog.exec() == QDialog.Accepted:
             self.set_curve_style(curve_id, **dialog.style())
+            self._user_changed()
+
+    def _edit_grid_style(self) -> None:
+        """Open the grid style dialog (applies to all panels)."""
+        dialog = GridStyleDialog(self.get_grid_style(), self.default_grid_style(), self)
+        if dialog.exec() == QDialog.Accepted:
+            self.set_grid_style(**dialog.style())
             self._user_changed()
 
     def _show_menu(self, panel_id: str, group: List[_Axis], under: Optional[_Curve]) -> None:
@@ -957,6 +1005,9 @@ class PlotCanvas(FigureCanvasQTAgg):
                         self.set_grid(a, on, w, d)
                         self._user_changed()
                     action(text, toggle_grid, axis.grid.get((direction, which), False), parent=grid_menu)
+
+        grid_menu.addSeparator()
+        action("Grid style…", self._edit_grid_style, parent=grid_menu)
 
         if panel_id in self._legends:
             def toggle_legend(on: bool) -> None:

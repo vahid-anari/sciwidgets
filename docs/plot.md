@@ -4,7 +4,7 @@ A Matplotlib canvas for Qt windows, built from a plain description of panels
 and curves — for example a section of a JSON settings file. The app then only
 feeds data by curve id. Import from `sciwidgets.plot`.
 
-<img src="images/plot_demo.png" width="1112" alt="Plot demo">
+<img src="images/plot_demo.png" width="900" alt="Plot demo">
 
 Run `python -m sciwidgets.plot` to try it: right-click any panel for the style
 menu, left-click the top panel to move the highlighted window.
@@ -115,6 +115,7 @@ Kinds: `vline`, `hline` (a position) and `vspan`, `hspan` (`[lo, hi]`);
 | `set_label(panel, "x" or "y", label, unit)` | axis label |
 | `set_grid(panel, visible, which="major", direction="y")` | grid lines |
 | `set_legend_visible(panel, bool)` | legend |
+| `set_grid_style(linestyle=..., linewidth=..., alpha=...)`, `get_grid_style()` | style of all grid lines |
 | `export(path)` | save as PDF, PNG, SVG, ... (from the extension) |
 | `redraw()` | schedule a redraw after changes |
 | `axes(panel)`, `line(id)` | the Matplotlib objects, for anything else |
@@ -139,16 +140,18 @@ keys of `DEFAULT_AXES_STYLE`:
 ## What the user changes, and saving it
 
 Right-clicking a panel opens a menu: the style of the curve under the mouse,
-every curve's style (colour, line, width, marker, size) and visibility, grids
-and the legend, each curve with its colour swatch. `context_menu=False` turns
-the menu off.
+every curve's style (colour, line, width, marker, size) and visibility, grids,
+a grid style for the whole figure (line, width, opacity; the colours stay
+automatic) and the legend, each curve with its colour swatch.
+`context_menu=False` turns the menu off.
 
 `get_config()` returns only what differs from the description, as plain data
 you can store (e.g. in `QSettings` as JSON):
 
 ```python
 {"curves": {"flux": {"color": "#d62728", "linewidth": 2.0}, "fit": {"visible": False}},
- "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}}}
+ "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}},
+ "grid_style": {"linestyle": ":", "alpha": 0.5}}
 ```
 
 `set_config(cfg)` restores it, `reset_config()` returns to the description.
