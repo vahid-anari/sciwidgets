@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QPlainTextEdit,
+    QPushButton,
     QVBoxLayout,
     QWidget,
 )
@@ -41,16 +43,16 @@ DESCRIPTION = json.loads(r"""
       "legend": {"loc": "upper right"},
       "curves": {
         "data": {"label": "data", "legend": "data", "style": "data"},
-        "flux": {"label": "F", "unit": "Jy", "style": "model", "props": {"color": "b"}},
-        "fit": {"label": "F_\\mathrm{fit}", "style": "model", "props": {"color": "r", "linestyle": "--"}}
+        "flux": {"label": "F", "name": "F", "unit": "Jy", "style": "model", "props": {"color": "b"}},
+        "fit": {"label": "F_\\mathrm{fit}", "name": "F fit", "style": "model", "props": {"color": "r", "linestyle": "--"}}
       }
     },
     "profiles": {
       "x": {"label": "t", "unit": "d"},
       "select": "one",
       "curves": {
-        "lambda": {"label": "\\Lambda_n", "unit": "\\Lambda_0", "style": "model", "props": {"color": "c"}},
-        "t1": {"label": "T_1", "unit": "T_0", "style": "model", "props": {"color": "forestgreen"}}
+        "lambda": {"label": "\\Lambda_n", "name": "Λₙ", "unit": "\\Lambda_0", "style": "model", "props": {"color": "c"}},
+        "t1": {"label": "T_1", "name": "T₁", "unit": "T_0", "style": "model", "props": {"color": "forestgreen"}}
       },
       "twin": {
         "primary": "w",
@@ -63,8 +65,8 @@ DESCRIPTION = json.loads(r"""
       "y": {"label": "S", "unit": "Jy"},
       "legend": {"loc": "upper left", "fontsize": 8},
       "curves": {
-        "s1": {"label": "S_1", "style": "model"},
-        "s2": {"label": "S_2", "style": "model", "props": {"linestyle": "--"}}
+        "s1": {"label": "S_1", "name": "S₁", "style": "model"},
+        "s2": {"label": "S_2", "name": "S₂", "style": "model", "props": {"linestyle": "--"}}
       }
     }
   }
@@ -130,7 +132,7 @@ def _demo_main() -> int:
 
     def move_window(event) -> None:
         """Click on the top panel to move the window there."""
-        if event.inaxes is canvas.axes("flux") and event.xdata is not None:
+        if event.button == 1 and event.inaxes is canvas.axes("flux") and event.xdata is not None:
             canvas.set_marker("center", event.xdata)
             canvas.set_marker("window", (event.xdata - 10, event.xdata + 10))
             canvas.redraw()
@@ -145,14 +147,30 @@ def _demo_main() -> int:
     for w in (profile, show_w, show_fit, grid, legend, show_window):
         controls.addWidget(w)
     controls.addStretch(1)
-    controls.addWidget(QLabel("Click the top panel to move the window"))
+    controls.addWidget(QLabel("Left-click the top panel: move the window · Right-click any panel: styles"))
+
+    # User changes made through the right-click menu, saved and restored as plain data
+    log = QPlainTextEdit(readOnly=True, maximumHeight=70)
+    canvas.configChanged.connect(lambda cfg: log.setPlainText(f"configChanged: {cfg}"))
+    saved = {}
+    save = QPushButton("Save config")
+    save.clicked.connect(lambda: (saved.update(cfg=canvas.get_config()), log.setPlainText(f"saved: {saved['cfg']}")))
+    restore = QPushButton("Restore saved")
+    restore.clicked.connect(lambda: (canvas.set_config(saved.get("cfg", {})), canvas.redraw()))
+    reset = QPushButton("Reset all")
+    reset.clicked.connect(lambda: (canvas.reset_config(), canvas.redraw()))
+    config_row = QHBoxLayout()
+    for b in (save, restore, reset):
+        config_row.addWidget(b)
+    config_row.addWidget(log, 1)
 
     win = QWidget()
     win.setWindowTitle("PlotCanvas demo")
     col = QVBoxLayout(win)
     col.addWidget(canvas, 1)
     col.addLayout(controls)
-    win.resize(1000, 650)
+    col.addLayout(config_row)
+    win.resize(1000, 720)
     win.show()
     return app.exec()
 

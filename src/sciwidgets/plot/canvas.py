@@ -37,10 +37,11 @@ Description keys:
 ``panels``
     One entry per panel id of the mosaic:
 
-    * ``curves``: ``{id: {"label", "unit", "legend", "style", "props"}}``.
+    * ``curves``: ``{id: {"label", "unit", "legend", "name", "style", "props"}}``.
       ``label`` and ``unit`` are math text (without ``$``) used for the axis
-      label; ``legend`` is the legend text (default: the label); ``props``
-      overrides single properties of the style.
+      label; ``legend`` is the legend text (default: the label); ``name`` is
+      plain text for menus (default: the id); ``props`` overrides single
+      properties of the style.
     * ``x``, ``y``: ``{"label", "unit", "scale", "lim"}`` for the axis.
     * ``primary``: the curve whose colour the zero line and the y grid take
       and whose label/unit name the y axis, unless ``y`` has a label.
@@ -58,6 +59,12 @@ Description keys:
     ``{id: {"kind": "vline" | "hline" | "vspan" | "hspan", "panels": "all" or
     [panel ids], "at": x (or y) for a line, [lo, hi] for a span,
     "visible": bool, "props": {...}}}``. Move them with ``set_marker``.
+
+User changes
+    Right-clicking a panel opens a menu to change curve styles (colour,
+    line, marker), show or hide curves, grids and the legend. ``get_config``
+    returns only what differs from the description, ``set_config`` restores
+    it, and ``configChanged`` reports changes the user made.
 """
 
 from __future__ import annotations
@@ -72,7 +79,11 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoMinorLocator, ScalarFormatter
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QAction, QCursor
+from PySide6.QtWidgets import QDialog, QMenu, QWidget
+
+from ._style_dialog import CurveStyleDialog
 
 __all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text"]
 
@@ -98,7 +109,10 @@ an offset text when outside ``sci_limits``).
 
 _PANEL_KEYS = frozenset({"curves", "x", "y", "primary", "select", "zero_line", "legend", "grid", "twin"})
 _TWIN_KEYS = frozenset({"axis", "curves", "x", "y", "primary", "select", "zero_line", "grid"})
-_CURVE_KEYS = frozenset({"label", "unit", "legend", "style", "props"})
+_CURVE_KEYS = frozenset({"label", "unit", "legend", "name", "style", "props"})
+_STYLE_KEYS = ("color", "linestyle", "linewidth", "marker", "markersize")
+_GRID_KEYS = {("y", "major"): "y_major", ("y", "minor"): "y_minor",
+              ("x", "major"): "x_major", ("x", "minor"): "x_minor"}
 _MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "props"})
 _MARKER_KINDS = ("vline", "hline", "vspan", "hspan")
 
@@ -148,6 +162,7 @@ class _Curve:
     label: str = ""
     unit: str = ""
     legend: str = ""
+    name: str = ""
 
 
 @dataclass
@@ -183,7 +198,14 @@ class PlotCanvas(FigureCanvasQTAgg):
 
     Panels are addressed by their mosaic id, twins by ``"<panel>.twin"``,
     curves by their id (unique across the figure).
+
+    Signals:
+        configChanged (object): The user changed a style, a curve's
+            visibility, a grid or a legend through the right-click menu;
+            sends ``get_config()``.
     """
+
+    configChanged = Signal(object)
 
     def __init__(
             self,
@@ -191,6 +213,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             parent: Optional[QWidget] = None,
             *,
             usetex: bool = False,
+            context_menu: bool = True,
     ) -> None:
         """Build the figure.
 
@@ -198,6 +221,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             description: Figure description (see the module docstring).
             parent: Parent widget.
             usetex: Render axis labels with the system LaTeX.
+            context_menu: Offer the right-click menu for user changes.
 
         Raises:
             ValueError: For an unknown key, a panel missing from the mosaic,
@@ -239,6 +263,12 @@ class PlotCanvas(FigureCanvasQTAgg):
             self.add_marker(marker_id, marker_spec.get("kind", "vline"), marker_spec.get("panels", "all"),
                             marker_spec.get("at"), visible=marker_spec.get("visible", True),
                             **marker_spec.get("props", {}))
+
+        # What the description gives; get_config reports differences from it
+        self._default_styles = {cid: self.get_curve_style(cid) for cid in self._curves}
+        self._default_visible = {cid: c.line.get_visible() for cid, c in self._curves.items()}
+        if context_menu:
+            self.mpl_connect("button_press_event", self._on_press)
 
     # ----- construction -----
     @staticmethod
@@ -360,6 +390,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             id=curve_id, axis_id=axis.id, line=line,
             label=label, unit=spec.get("unit", ""),
             legend=spec.get("legend", f"${label}$" if label else ""),
+            name=spec.get("name", curve_id),
         )
         axis.curves[curve_id] = curve
         self._curves[curve_id] = curve
@@ -713,6 +744,177 @@ class PlotCanvas(FigureCanvasQTAgg):
     def marker_ids(self) -> List[str]:
         """Return the ids of all markers."""
         return list(self._markers)
+
+    # ----- user configuration -----
+    def get_config(self) -> Dict[str, Any]:
+        """Return what differs from the description, as plain JSON data.
+
+        Contains curve styles, the visibility of curves that are not on a
+        ``select: one`` axis, grids and legend visibility::
+
+            {"curves": {"flux": {"color": "#d62728", "linewidth": 2.0},
+                        "fit": {"visible": False}},
+             "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}}}
+        """
+        curves: Dict[str, Dict[str, Any]] = {}
+        for cid, curve in self._curves.items():
+            style = self.get_curve_style(cid)
+            diff = {k: v for k, v in style.items() if v != self._default_styles[cid][k]}
+            if not self._axes[curve.axis_id].select_one and curve.line.get_visible() != self._default_visible[cid]:
+                diff["visible"] = curve.line.get_visible()
+            if diff:
+                curves[cid] = diff
+        axes: Dict[str, Dict[str, Any]] = {}
+        for axis_id, axis in self._axes.items():
+            diff = {_GRID_KEYS[key]: True for key, on in axis.grid.items() if on}
+            if axis_id in self._legends and not self._legend_on.get(axis_id, True):
+                diff["legend"] = False
+            if diff:
+                axes[axis_id] = diff
+        out: Dict[str, Any] = {}
+        if curves:
+            out["curves"] = curves
+        if axes:
+            out["axes"] = axes
+        return out
+
+    def set_config(self, config: Mapping[str, Any]) -> None:
+        """Apply a configuration from ``get_config`` (no ``configChanged``).
+
+        Everything not in ``config`` returns to the description's state;
+        unknown curves, axes and keys are ignored, so an old file still loads.
+        """
+        self.reset_config()
+        for cid, diff in dict(config.get("curves", {})).items():
+            if cid not in self._curves:
+                continue
+            style = {k: v for k, v in diff.items() if k in _STYLE_KEYS}
+            if style:
+                self.set_curve_style(cid, **style)
+            if "visible" in diff and not self._axes[self._curves[cid].axis_id].select_one:
+                self.set_curve_visible(cid, bool(diff["visible"]))
+        reverse = {v: k for k, v in _GRID_KEYS.items()}
+        for axis_id, diff in dict(config.get("axes", {})).items():
+            if axis_id not in self._axes:
+                continue
+            for key, on in diff.items():
+                if key in reverse:
+                    direction, which = reverse[key]
+                    self.set_grid(axis_id, bool(on), which, direction)
+                elif key == "legend" and axis_id in self._legends:
+                    self.set_legend_visible(axis_id, bool(on))
+
+    def reset_config(self) -> None:
+        """Return styles, visibility, grids and legends to the description (no signal)."""
+        for cid, curve in self._curves.items():
+            self.set_curve_style(cid, **self._default_styles[cid])
+            if not self._axes[curve.axis_id].select_one:
+                self.set_curve_visible(cid, self._default_visible[cid])
+        for axis_id, axis in self._axes.items():
+            axis.grid.clear()
+            self._apply_grid(axis)
+        for panel_id in self._legends:
+            self.set_legend_visible(panel_id, True)
+
+    # ----- right-click menu -----
+    def _on_press(self, event: Any) -> None:
+        """Open the menu on a right click inside a panel."""
+        if event.button != 3 or event.inaxes is None:
+            return
+        hit = next((a for a in self._axes.values() if a.ax is event.inaxes), None)
+        if hit is None:
+            return
+        panel_id = hit.panel_id
+        group = [a for a in self._axes.values() if a.panel_id == panel_id]
+        under = next((c for a in group if a.ax.get_visible() for c in a.curves.values()
+                      if c.line.get_visible() and c.line.contains(event)[0]), None)
+        self._show_menu(panel_id, group, under)
+
+    def _user_changed(self) -> None:
+        """Redraw and report a change made through the menu."""
+        self.redraw()
+        self.configChanged.emit(self.get_config())
+
+    def _edit_style(self, curve_id: str) -> None:
+        """Open the style dialog for a curve."""
+        curve = self._curves[curve_id]
+        dialog = CurveStyleDialog(curve.name, self.get_curve_style(curve_id),
+                                  self._default_styles[curve_id], self)
+        if dialog.exec() == QDialog.Accepted:
+            self.set_curve_style(curve_id, **dialog.style())
+            self._user_changed()
+
+    def _show_menu(self, panel_id: str, group: List[_Axis], under: Optional[_Curve]) -> None:
+        """Show the right-click menu of a panel at the mouse."""
+        self._build_menu(panel_id, group, under).exec(QCursor.pos())
+
+    def _build_menu(self, panel_id: str, group: List[_Axis], under: Optional[_Curve]) -> QMenu:
+        """Build the right-click menu of a panel."""
+        menu = QMenu(self)
+
+        def action(text: str, slot, checked: Optional[bool] = None, parent: QMenu = menu) -> QAction:
+            act = QAction(text, parent)
+            if checked is not None:
+                act.setCheckable(True)
+                act.setChecked(checked)
+            act.triggered.connect(slot)
+            parent.addAction(act)
+            return act
+
+        if under is not None:
+            action(f"Style of {under.name}…", lambda: self._edit_style(under.id))
+            menu.addSeparator()
+
+        for axis in group:
+            if not axis.curves:
+                continue
+            sub = menu.addMenu("Curves (right axis)" if axis.twin_of and len(group) > 1 else "Curves")
+            for cid, curve in axis.curves.items():
+                item = sub.addMenu(curve.name)
+                action("Style…", lambda _=False, c=cid: self._edit_style(c), parent=item)
+                if not axis.select_one:
+                    def toggle(on: bool, c: str = cid) -> None:
+                        self.set_curve_visible(c, on)
+                        self._user_changed()
+                    action("Visible", toggle, curve.line.get_visible(), parent=item)
+
+        grid_menu = menu.addMenu("Grid")
+        for axis in group:
+            if not axis.ax.get_visible():
+                continue
+            prefix = "Right axis: " if axis.twin_of and axis.twin_axis == "x" else (
+                "Top axis: " if axis.twin_of else "")
+            directions = ("y", "x") if axis.twin_of is None else (("y",) if axis.twin_axis == "x" else ("x",))
+            for direction in directions:
+                for which in ("major", "minor"):
+                    text = f"{prefix}{'Horizontal' if direction == 'y' else 'Vertical'} {which}"
+
+                    def toggle_grid(on: bool, a: str = axis.id, d: str = direction, w: str = which) -> None:
+                        self.set_grid(a, on, w, d)
+                        self._user_changed()
+                    action(text, toggle_grid, axis.grid.get((direction, which), False), parent=grid_menu)
+
+        if panel_id in self._legends:
+            def toggle_legend(on: bool) -> None:
+                self.set_legend_visible(panel_id, on)
+                self._user_changed()
+            action("Legend", toggle_legend, self.is_legend_visible(panel_id))
+
+        menu.addSeparator()
+
+        def reset_panel() -> None:
+            for axis in group:
+                for cid in axis.curves:
+                    self.set_curve_style(cid, **self._default_styles[cid])
+                    if not axis.select_one:
+                        self.set_curve_visible(cid, self._default_visible[cid])
+                axis.grid.clear()
+                self._apply_grid(axis)
+            if panel_id in self._legends:
+                self.set_legend_visible(panel_id, True)
+            self._user_changed()
+        action("Reset this panel", reset_panel)
+        return menu
 
     def redraw(self) -> None:
         """Schedule a redraw (cheap to call often)."""
