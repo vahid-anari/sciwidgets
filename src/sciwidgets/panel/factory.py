@@ -27,6 +27,7 @@ from sciwidgets.params import (
     ParameterComboBox,
     ParameterLineEdit,
     ParameterToggle,
+    ParameterWidgetBase,
     SliderFeature,
 )
 
@@ -35,7 +36,7 @@ __all__ = ["RESERVED_KEYS", "register_type", "widget_from_spec", "widget_types"]
 RESERVED_KEYS = frozenset({"type", "path", "stretch"})
 """Keys used by the panel itself; they are never passed to a constructor."""
 
-_TYPES: Dict[str, Type[QWidget]] = {
+_TYPES: Dict[str, Type[ParameterWidgetBase]] = {
     "float-slider": FloatSlider,
     "int-slider": IntSlider,
     "array-slider": ArraySlider,
@@ -75,20 +76,23 @@ _CONVERTERS: Dict[str, Callable[[Any], Any]] = {
 """Arguments whose JSON form differs from the Python one, by argument name."""
 
 
-def register_type(name: str, cls: Type[QWidget], *, replace: bool = False) -> None:
+def register_type(name: str, cls: Type[ParameterWidgetBase], *, replace: bool = False) -> None:
     """Make a widget class available under a type name.
 
     The class is built with the description's keys as keyword arguments, so
-    its constructor must accept them by name.
+    its constructor must accept them by name, plus ``parent``.
 
     Args:
         name: Type name used in descriptions, e.g. ``"pulse"``.
-        cls: Widget class.
+        cls: Widget class, a subclass of ``ParameterWidgetBase``.
         replace: Allow replacing an existing type of the same name.
 
     Raises:
+        TypeError: If ``cls`` is not a ``ParameterWidgetBase`` subclass.
         ValueError: If the name is already registered and ``replace`` is False.
     """
+    if not (isinstance(cls, type) and issubclass(cls, ParameterWidgetBase)):
+        raise TypeError(f"widget type {name!r}: {cls!r} is not a ParameterWidgetBase subclass")
     if name in _TYPES and not replace:
         raise ValueError(f"widget type {name!r} is already registered (pass replace=True to override)")
     _TYPES[name] = cls
@@ -99,7 +103,7 @@ def widget_types() -> List[str]:
     return sorted(_TYPES)
 
 
-def widget_from_spec(spec: Mapping[str, Any], parent: Optional[QWidget] = None) -> QWidget:
+def widget_from_spec(spec: Mapping[str, Any], parent: Optional[QWidget] = None) -> ParameterWidgetBase:
     """Create a widget from its description.
 
     ``"type"`` selects the class; ``"path"`` and ``"stretch"`` are ignored
