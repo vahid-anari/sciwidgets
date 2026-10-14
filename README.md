@@ -31,6 +31,9 @@ and moved into this package so other apps can share them.
 - **Parameter panels**: build groups, columns and tabs of parameter widgets
   from a JSON-style description, with templates and shared defaults, and read
   or restore all values as one dict.
+- **Plot canvas**: Matplotlib panels, twins, legends and markers from a
+  description; data by curve id; a right-click style menu whose changes save
+  as plain data.
 - **Dialogs**: information, warning, error, question, rich-text and About
   dialogs.
 
@@ -41,6 +44,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.params` (sliders) | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `SliderFeature` | [Sliders](https://github.com/vahid-anari/sciwidgets/blob/main/docs/sliders.md) |
 | `sciwidgets.params` (inputs) | `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit` | [Parameter widgets](https://github.com/vahid-anari/sciwidgets/blob/main/docs/params.md) |
 | `sciwidgets.panel` | `ParameterPage`, `ParameterTabs`, `widget_from_spec`, `register_type` | [Parameter panels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/panel.md) |
+| `sciwidgets.plot` | `PlotCanvas`, `CurveSelector`, `CurveCheckBox` | [Plot canvas](https://github.com/vahid-anari/sciwidgets/blob/main/docs/plot.md) |
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
