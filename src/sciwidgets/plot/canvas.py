@@ -49,7 +49,8 @@ Description keys:
       the shown curve is then the primary one.
     * ``zero_line``: draw a horizontal line at y = 0 (default true).
     * ``legend``: Matplotlib legend arguments; without it, no legend.
-    * ``grid``: line properties of this panel's grid lines.
+    * ``grid``: line properties of this panel's value-axis grid lines
+      (added to ``grid_value``).
     * ``twin``: a second axis sharing the panel: ``{"axis": "x"}`` (default)
       adds a y axis on the right, ``{"axis": "y"}`` an x axis on top. It
       takes ``curves``, ``x``/``y``, ``primary``, ``select``, ``zero_line``
@@ -99,13 +100,22 @@ DEFAULT_AXES_STYLE: Dict[str, Any] = {
     "x_format": "plain",
     "y_format": "sci",
     "sci_limits": [-2, 3],
-    "grid": {"alpha": 0.3},
+    "grid": {},
+    "grid_value": {"alpha": 0.3},
+    "ticks_x": {},
+    "ticks_y": {},
+    "label_pad": [None, None],
 }
 """Shared axis styling; a description's ``axes_style`` overrides single keys.
 
 ``minor_locator`` is the number of minor intervals per major one, for x and
 y; ``x_format``/``y_format`` are ``"plain"`` or ``"sci"`` (scientific with
-an offset text when outside ``sci_limits``).
+an offset text when outside ``sci_limits``); ``ticks_x``/``ticks_y`` are
+extra tick settings for one axis only (e.g. ``{"pad": 5}``); ``label_pad``
+is the x and y label distance in points (``None`` = Matplotlib's default);
+``grid`` styles all grid lines, ``grid_value`` additionally the lines along
+the value axis (horizontal for a panel), which take the primary curve's
+colour.
 """
 
 _PANEL_KEYS = frozenset({"curves", "x", "y", "primary", "select", "zero_line", "legend", "grid", "twin"})
@@ -189,6 +199,7 @@ class _Axis:
     x_spec: Dict[str, Any] = field(default_factory=dict)
     y_spec: Dict[str, Any] = field(default_factory=dict)
     grid_props: Dict[str, Any] = field(default_factory=dict)
+    value_grid_props: Dict[str, Any] = field(default_factory=dict)
     grid: Dict[Tuple[str, str], bool] = field(default_factory=dict)  # (direction, which) -> on
     twin_of: Optional[str] = None
     twin_axis: str = ""
@@ -269,7 +280,7 @@ class PlotCanvas(FigureCanvasQTAgg):
                             **marker_spec.get("props", {}))
 
         # What the description gives; get_config reports differences from it
-        self._default_styles = {cid: self.get_curve_style(cid) for cid in self._curves}
+        self._default_styles = {cid: self._style_of(cid) for cid in self._curves}
         self._default_visible = {cid: c.line.get_visible() for cid, c in self._curves.items()}
         if context_menu:
             self.mpl_connect("button_press_event", self._on_press)
@@ -345,7 +356,9 @@ class PlotCanvas(FigureCanvasQTAgg):
             id=axis_id, ax=ax, panel_id=panel_id,
             select_one=spec.get("select") == "one",
             x_spec=dict(spec.get("x", {})), y_spec=dict(spec.get("y", {})),
-            grid_props=_merge(self._axes_style["grid"], spec.get("grid", {})),
+            grid_props=dict(self._axes_style["grid"]),
+            value_grid_props=_merge(_merge(self._axes_style["grid"], self._axes_style["grid_value"]),
+                                    spec.get("grid", {})),
         )
         if spec.get("select") not in (None, "one"):
             raise ValueError(f"{axis_id!r}: 'select' must be \"one\"")
@@ -404,6 +417,10 @@ class PlotCanvas(FigureCanvasQTAgg):
         st = self._axes_style
         ax.tick_params(axis="both", which="major", **st["ticks"], **st["ticks_major"])
         ax.tick_params(axis="both", which="minor", **st["ticks"], **st["ticks_minor"])
+        if st["ticks_x"]:
+            ax.tick_params(axis="x", which="both", **st["ticks_x"])
+        if st["ticks_y"]:
+            ax.tick_params(axis="y", which="both", **st["ticks_y"])
         nx, ny = st["minor_locator"]
         if nx:
             ax.xaxis.set_minor_locator(AutoMinorLocator(nx))
@@ -422,7 +439,9 @@ class PlotCanvas(FigureCanvasQTAgg):
     def _set_label_text(self, ax: Axes, which: str, text: str) -> None:
         """Set an axis label with the shared font."""
         setter = ax.set_xlabel if which == "x" else ax.set_ylabel
-        setter(text, usetex=self._usetex, **self._axes_style["label_font"])
+        pad = self._axes_style["label_pad"][0 if which == "x" else 1]
+        extra = {"labelpad": pad} if pad is not None else {}
+        setter(text, usetex=self._usetex, **self._axes_style["label_font"], **extra)
 
     # ----- keeping an axis consistent with its primary curve -----
     def _primary_color(self, axis: _Axis) -> Optional[str]:
@@ -466,7 +485,7 @@ class PlotCanvas(FigureCanvasQTAgg):
         color = self._primary_color(axis)
         for (direction, which), on in axis.grid.items():
             if on and not (axis.select_one and axis.primary is None and direction == value_dir):
-                props = dict(axis.grid_props)
+                props = dict(axis.value_grid_props if direction == value_dir else axis.grid_props)
                 if direction == value_dir and color is not None:
                     props.setdefault("color", color)
                 axis.ax.grid(True, which=which, axis=direction, **props)
@@ -586,6 +605,11 @@ class PlotCanvas(FigureCanvasQTAgg):
 
     def get_curve_style(self, curve_id: str) -> Dict[str, Any]:
         """Return a curve's colour, line style and width, marker and marker size."""
+        return self._style_of(curve_id)
+
+    def _style_of(self, curve_id: str) -> Dict[str, Any]:
+        """The style as ``get_curve_style`` returns it; used internally so that
+        subclasses may extend ``get_curve_style`` without affecting the canvas."""
         line = self._curve(curve_id).line
         return {
             "color": mcolors.to_hex(line.get_color()),
@@ -594,6 +618,26 @@ class PlotCanvas(FigureCanvasQTAgg):
             "marker": line.get_marker(),
             "markersize": float(line.get_markersize()),
         }
+
+    def default_curve_style(self, curve_id: str) -> Dict[str, Any]:
+        """Return a curve's style as given by the description (``get_curve_style`` format)."""
+        self._curve(curve_id)
+        return dict(self._default_styles[curve_id])
+
+    def style_axes(self, ax: Axes, zero_line: bool = True) -> Optional[Line2D]:
+        """Apply the canvas' axis styling to any axes, e.g. in a separate export figure.
+
+        Args:
+            ax: Matplotlib axes, from any figure.
+            zero_line: Also draw the zero line.
+
+        Returns:
+            The zero line, or ``None``.
+        """
+        self._style_axes(ax)
+        if zero_line and self._axes_style.get("zero_line"):
+            return ax.axhline(0.0, **self._axes_style["zero_line"])
+        return None
 
     def get_curve_name(self, curve_id: str) -> str:
         """Return a curve's plain-text name (for menus and selectors)."""
@@ -767,7 +811,7 @@ class PlotCanvas(FigureCanvasQTAgg):
         """
         curves: Dict[str, Dict[str, Any]] = {}
         for cid, curve in self._curves.items():
-            style = self.get_curve_style(cid)
+            style = self._style_of(cid)
             diff = {k: v for k, v in style.items() if v != self._default_styles[cid][k]}
             if not self._axes[curve.axis_id].select_one and curve.line.get_visible() != self._default_visible[cid]:
                 diff["visible"] = curve.line.get_visible()
@@ -847,7 +891,7 @@ class PlotCanvas(FigureCanvasQTAgg):
     def _edit_style(self, curve_id: str) -> None:
         """Open the style dialog for a curve."""
         curve = self._curves[curve_id]
-        dialog = CurveStyleDialog(curve.name, self.get_curve_style(curve_id),
+        dialog = CurveStyleDialog(curve.name, self._style_of(curve_id),
                                   self._default_styles[curve_id], self)
         if dialog.exec() == QDialog.Accepted:
             self.set_curve_style(curve_id, **dialog.style())
@@ -872,7 +916,7 @@ class PlotCanvas(FigureCanvasQTAgg):
 
         if under is not None:
             act = action(f"Style of {under.name}…", lambda: self._edit_style(under.id))
-            act.setIcon(color_icon(self.get_curve_style(under.id)["color"]))
+            act.setIcon(color_icon(self._style_of(under.id)["color"]))
             act.setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
             menu.addSeparator()
 
@@ -881,7 +925,7 @@ class PlotCanvas(FigureCanvasQTAgg):
                 continue
             sub = menu.addMenu("Curves (right axis)" if axis.twin_of and len(group) > 1 else "Curves")
             for cid, curve in axis.curves.items():
-                item = sub.addMenu(color_icon(self.get_curve_style(cid)["color"]), curve.name)
+                item = sub.addMenu(color_icon(self._style_of(cid)["color"]), curve.name)
                 item.menuAction().setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
                 action("Style…", lambda _=False, c=cid: self._edit_style(c), parent=item)
                 if not axis.select_one:
