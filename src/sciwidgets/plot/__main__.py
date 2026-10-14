@@ -29,6 +29,12 @@ DESCRIPTION = json.loads(r"""
     "data": {"linestyle": "", "marker": "o", "markersize": 3, "color": "k"},
     "model": {"linewidth": 1.25}
   },
+  "markers": {
+    "window": {"kind": "vspan", "panels": ["flux", "profiles"], "at": [30, 50],
+               "props": {"color": "b", "alpha": 0.1}},
+    "center": {"kind": "vline", "panels": ["flux", "profiles"], "at": 40,
+               "props": {"color": "r", "linewidth": 0.75, "alpha": 0.6}}
+  },
   "panels": {
     "flux": {
       "primary": "flux",
@@ -118,15 +124,28 @@ def _demo_main() -> int:
         canvas.redraw()
     grid.toggled.connect(toggle_grid)
 
+    show_window = QCheckBox("Window", checked=True)
+    show_window.toggled.connect(lambda on: ([canvas.set_marker_visible(m, on) for m in ("window", "center")],
+                                            canvas.redraw()))
+
+    def move_window(event) -> None:
+        """Click on the top panel to move the window there."""
+        if event.inaxes is canvas.axes("flux") and event.xdata is not None:
+            canvas.set_marker("center", event.xdata)
+            canvas.set_marker("window", (event.xdata - 10, event.xdata + 10))
+            canvas.redraw()
+    canvas.mpl_connect("button_press_event", move_window)
+
     legend = QCheckBox("Legends", checked=True)
     legend.toggled.connect(lambda on: ([canvas.set_legend_visible(p, on) for p in ("flux", "spectrum")],
                                        canvas.redraw()))
 
     controls = QHBoxLayout()
     controls.addWidget(QLabel("Bottom plot:"))
-    for w in (profile, show_w, show_fit, grid, legend):
+    for w in (profile, show_w, show_fit, grid, legend, show_window):
         controls.addWidget(w)
     controls.addStretch(1)
+    controls.addWidget(QLabel("Click the top panel to move the window"))
 
     win = QWidget()
     win.setWindowTitle("PlotCanvas demo")

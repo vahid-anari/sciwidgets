@@ -53,6 +53,11 @@ Description keys:
       adds a y axis on the right, ``{"axis": "y"}`` an x axis on top. It
       takes ``curves``, ``x``/``y``, ``primary``, ``select``, ``zero_line``
       and ``grid`` like a panel, and is addressed as ``"<panel>.twin"``.
+``markers``
+    Lines and bands drawn across panels, e.g. to highlight a time window:
+    ``{id: {"kind": "vline" | "hline" | "vspan" | "hspan", "panels": "all" or
+    [panel ids], "at": x (or y) for a line, [lo, hi] for a span,
+    "visible": bool, "props": {...}}}``. Move them with ``set_marker``.
 """
 
 from __future__ import annotations
@@ -94,6 +99,8 @@ an offset text when outside ``sci_limits``).
 _PANEL_KEYS = frozenset({"curves", "x", "y", "primary", "select", "zero_line", "legend", "grid", "twin"})
 _TWIN_KEYS = frozenset({"axis", "curves", "x", "y", "primary", "select", "zero_line", "grid"})
 _CURVE_KEYS = frozenset({"label", "unit", "legend", "style", "props"})
+_MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "props"})
+_MARKER_KINDS = ("vline", "hline", "vspan", "hspan")
 
 
 def axis_text(label: str, unit: str = "") -> str:
@@ -144,6 +151,15 @@ class _Curve:
 
 
 @dataclass
+class _Marker:
+    """A line or band drawn on one or more panels."""
+
+    kind: str
+    artists: List[Any]
+    at: Any = None
+
+
+@dataclass
 class _Axis:
     """One Matplotlib axes (a panel or a twin) and its state."""
 
@@ -187,7 +203,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             ValueError: For an unknown key, a panel missing from the mosaic,
                 a repeated curve id, an unknown style or primary curve.
         """
-        _check_keys(description, frozenset({"layout", "figure", "styles", "axes_style", "panels"}),
+        _check_keys(description, frozenset({"layout", "figure", "styles", "axes_style", "panels", "markers"}),
                     "description")
         self._usetex = usetex
         self._styles: Dict[str, Dict[str, Any]] = dict(description.get("styles", {}))
@@ -196,6 +212,7 @@ class PlotCanvas(FigureCanvasQTAgg):
         self._curves: Dict[str, _Curve] = {}
         self._legends: Dict[str, Dict[str, Any]] = {}
         self._legend_on: Dict[str, bool] = {}
+        self._markers: Dict[str, _Marker] = {}
 
         fig_spec = dict(description.get("figure", {}))
         margins = fig_spec.pop("margins", None)
@@ -217,6 +234,11 @@ class PlotCanvas(FigureCanvasQTAgg):
             self._refresh_axis(axis)
         for panel_id in self._legends:
             self._update_legend(panel_id)
+        for marker_id, marker_spec in description.get("markers", {}).items():
+            _check_keys(marker_spec, _MARKER_KEYS, f"marker {marker_id!r}")
+            self.add_marker(marker_id, marker_spec.get("kind", "vline"), marker_spec.get("panels", "all"),
+                            marker_spec.get("at"), visible=marker_spec.get("visible", True),
+                            **marker_spec.get("props", {}))
 
     # ----- construction -----
     @staticmethod
@@ -598,6 +620,99 @@ class PlotCanvas(FigureCanvasQTAgg):
         """Return whether a panel's legend is shown."""
         panel = self._axis(panel_id).panel_id
         return panel in self._legends and self._legend_on.get(panel, True)
+
+    # ----- markers -----
+    def add_marker(self, marker_id: str, kind: str, panels: Any = "all", at: Any = None,
+                   *, visible: bool = True, **props: Any) -> None:
+        """Draw a line or band on panels.
+
+        Args:
+            marker_id: Id used to move or hide it later.
+            kind: ``"vline"``, ``"hline"`` (a line at ``at``) or ``"vspan"``,
+                ``"hspan"`` (a band from ``at[0]`` to ``at[1]``).
+            panels: ``"all"`` (every panel, not the twins) or a list of
+                panel or twin ids.
+            at: Position; defaults to 0 for lines and (0, 1) for bands.
+            visible: Whether it is shown at first.
+            **props: Matplotlib properties (``color``, ``alpha``, ...).
+
+        Raises:
+            ValueError: For a repeated id or an unknown kind.
+        """
+        if marker_id in self._markers:
+            raise ValueError(f"marker {marker_id!r} already exists")
+        if kind not in _MARKER_KINDS:
+            raise ValueError(f"marker {marker_id!r}: kind must be one of {', '.join(_MARKER_KINDS)}")
+        ids = [a for a, axis in self._axes.items() if axis.twin_of is None] if panels == "all" else list(panels)
+        if at is None:
+            at = (0.0, 1.0) if kind.endswith("span") else 0.0
+        artists = []
+        for axis_id in ids:
+            ax = self._axis(axis_id).ax
+            if kind == "vline":
+                artists.append(ax.axvline(at, **props))
+            elif kind == "hline":
+                artists.append(ax.axhline(at, **props))
+            elif kind == "vspan":
+                artists.append(ax.axvspan(at[0], at[1], **props))
+            else:
+                artists.append(ax.axhspan(at[0], at[1], **props))
+        marker = _Marker(kind=kind, artists=artists, at=at)
+        self._markers[marker_id] = marker
+        self.set_marker_visible(marker_id, visible)
+
+    def _marker(self, marker_id: str) -> _Marker:
+        try:
+            return self._markers[marker_id]
+        except KeyError:
+            raise KeyError(f"no marker {marker_id!r}") from None
+
+    def set_marker(self, marker_id: str, at: Any) -> None:
+        """Move a marker: a position for a line, ``(lo, hi)`` for a band."""
+        marker = self._marker(marker_id)
+        marker.at = at
+        for artist in marker.artists:
+            if marker.kind == "vline":
+                artist.set_xdata([at, at])
+            elif marker.kind == "hline":
+                artist.set_ydata([at, at])
+            else:
+                lo, hi = at
+                if hasattr(artist, "set_width"):  # Rectangle (Matplotlib >= 3.9)
+                    if marker.kind == "vspan":
+                        artist.set_x(lo)
+                        artist.set_width(hi - lo)
+                    else:
+                        artist.set_y(lo)
+                        artist.set_height(hi - lo)
+                elif marker.kind == "vspan":  # Polygon (older Matplotlib)
+                    artist.set_xy([[lo, 0], [lo, 1], [hi, 1], [hi, 0], [lo, 0]])
+                else:
+                    artist.set_xy([[0, lo], [0, hi], [1, hi], [1, lo], [0, lo]])
+
+    def get_marker(self, marker_id: str) -> Any:
+        """Return a marker's position (``at``)."""
+        return self._marker(marker_id).at
+
+    def set_marker_visible(self, marker_id: str, visible: bool) -> None:
+        """Show or hide a marker on all its panels."""
+        for artist in self._marker(marker_id).artists:
+            artist.set_visible(bool(visible))
+
+    def is_marker_visible(self, marker_id: str) -> bool:
+        """Return whether a marker is shown."""
+        artists = self._marker(marker_id).artists
+        return bool(artists) and artists[0].get_visible()
+
+    def remove_marker(self, marker_id: str) -> None:
+        """Delete a marker."""
+        for artist in self._marker(marker_id).artists:
+            artist.remove()
+        del self._markers[marker_id]
+
+    def marker_ids(self) -> List[str]:
+        """Return the ids of all markers."""
+        return list(self._markers)
 
     def redraw(self) -> None:
         """Schedule a redraw (cheap to call often)."""
