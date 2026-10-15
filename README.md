@@ -1,5 +1,7 @@
 # sciwidgets
 
+[![tests](https://github.com/vahid-anari/sciwidgets/actions/workflows/tests.yml/badge.svg)](https://github.com/vahid-anari/sciwidgets/actions/workflows/tests.yml)
+
 PySide6 widgets for scientific desktop apps: math labels rendered with
 LaTeX/mathtext, dialogs, and parameter inputs such as sliders, range sliders
 and validated number fields.
