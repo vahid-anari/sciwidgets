@@ -46,7 +46,7 @@ def _demo_main() -> int:
     layout.addLayout(form)
     # --- Simple parameter widgets ----------------------------------------
     t_edit = ParameterLineEdit(
-        label="t", init_val=5, val_fmt="{:0.1f}", unit_label=r"\mathrm{s}",
+        label="t", init_val=5, val_fmt="{:0.1f}", unit=r"\mathrm{s}",
         min_limit=0.0, min_limit_inclusive=False, parent=win,
     )
     n_edit = ParameterLineEdit(label=r"A_\alpha", init_val=5, value_is_int=True, parent=win)

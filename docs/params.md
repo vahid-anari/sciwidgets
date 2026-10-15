@@ -22,7 +22,7 @@ Run `python -m sciwidgets.params` to try them.
 from sciwidgets.params import ParameterLineEdit
 
 t0 = ParameterLineEdit(
-    label="t_0", unit_label=r"\mathrm{s}",
+    label="t_0", unit=r"\mathrm{s}",
     init_val=5.0, val_fmt="{:.1f}",
     min_limit=0.0, min_limit_inclusive=False,   # t0 > 0
 )
@@ -35,7 +35,7 @@ n = ParameterLineEdit(label="N", init_val=10, value_is_int=True)
 | `init_val` | required | Initial value |
 | `val_fmt` | `"{:0.6g}"` | Display format; typed values are rounded to it |
 | `value_is_int` | `False` | Accept integers only |
-| `unit_label` | `""` | Unit in LaTeX, shown in parentheses |
+| `unit` | `""` | Unit in LaTeX, shown in parentheses (older name: `unit_label`, still accepted) |
 | `min_limit`, `max_limit` | `None` | Allowed bounds |
 | `min_limit_inclusive`, `max_limit_inclusive` | `True` | Whether the bound itself is allowed |
 | `max_length` | `None` | Maximum number of characters |

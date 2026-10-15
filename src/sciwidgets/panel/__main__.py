@@ -24,7 +24,7 @@ DESCRIPTION = json.loads(r"""
        "min_val": 0.1, "max_val": 10, "init_val": 1, "val_fmt": "{:.2f}"}]}]}},
   {"id": "sample", "title": "Sample", "layout": {"column": [
     {"group": "Sample", "column": [
-      {"type": "line-edit", "path": "sample.nu", "label": "\\nu", "unit_label": "\\mathrm{MHz}",
+      {"type": "line-edit", "path": "sample.nu", "label": "\\nu", "unit": "\\mathrm{MHz}",
        "init_val": 6668.519, "min_limit": 0, "min_limit_inclusive": false},
       {"type": "combo-box", "path": "sample.species", "label": "\\mathrm{species}",
        "items": ["CH3OH", "H2O", "OH"]}]},

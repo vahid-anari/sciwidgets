@@ -24,7 +24,7 @@ class ParameterLineEdit(ParameterWidgetBase[Num]):
             init_val: Num,
             val_fmt: str = "{:0.6g}",
             value_is_int: bool = False,
-            unit_label: str = "",
+            unit: str = "",
             min_limit: Num | None = None,
             max_limit: Num | None = None,
             min_limit_inclusive: bool = True,
@@ -32,6 +32,7 @@ class ParameterLineEdit(ParameterWidgetBase[Num]):
             max_length: Optional[int] = None,
             width_chars: Optional[int] = None,
             parent: Optional[QWidget] = None,
+            unit_label: Optional[str] = None,
     ) -> None:
         """Initialize the parameter line edit.
 
@@ -40,7 +41,8 @@ class ParameterLineEdit(ParameterWidgetBase[Num]):
             init_val: Initial value.
             val_fmt: Display format string.
             value_is_int: Whether the value is an integer.
-            unit_label: Optional unit shown to the right, as LaTeX.
+            unit: Optional unit shown to the right in parentheses, as LaTeX
+                (the same name as on the sliders).
             min_limit: Optional lower hard limit.
             max_limit: Optional upper hard limit.
             min_limit_inclusive: Whether the lower hard limit is inclusive.
@@ -48,17 +50,25 @@ class ParameterLineEdit(ParameterWidgetBase[Num]):
             max_length: Optional maximum number of characters.
             width_chars: Optional width of the line edit in characters.
             parent: Optional parent widget.
+            unit_label: Older name of ``unit``, still accepted.
+
+        Raises:
+            TypeError: If both ``unit`` and ``unit_label`` are given.
         """
 
         super().__init__(parent)
+        if unit_label is not None:
+            if unit:
+                raise TypeError("give either unit or unit_label (its older name), not both")
+            unit = unit_label
 
         self._value_is_int = value_is_int
         self._parse = int if value_is_int else float
         self._label = MathLabel(f"{label}=", alignment=Qt.AlignRight | Qt.AlignVCenter)
         self._measured_name_width = self._label.sizeHint().width()
         self._unit_label: MathLabel | None = None
-        if unit_label:
-            self._unit_label = MathLabel(f"({unit_label})")
+        if unit:
+            self._unit_label = MathLabel(f"({unit})")
         self._line_edit = NumericLineEdit(
             init_val=init_val,
             value_is_int=value_is_int,

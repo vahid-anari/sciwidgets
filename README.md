@@ -62,8 +62,11 @@ automatically). A LaTeX installation is optional.
 For development, from the repo root:
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
+pytest
 ```
+
+The tests run without a window (Qt's offscreen platform) and take about a second.
 
 ## Quick start
 
@@ -132,6 +135,9 @@ python -m sciwidgets.labels
 python -m sciwidgets.dialogs
 python -m sciwidgets.params
 python -m sciwidgets.params.sliders
+python -m sciwidgets.window
+python -m sciwidgets.panel
+python -m sciwidgets.plot
 ```
 
 ## Versions

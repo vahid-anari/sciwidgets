@@ -123,7 +123,7 @@ dicts merge key by key:
   },
   "tabs": [{"id": "display", "title": "Display", "layout": {"column": [
     {"template": "window", "path": "display.t", "label": "t"},
-    {"template": "window", "path": "display.f", "label": "F", "max_val": 50}
+    {"template": "window", "path": "display.f", "label": "F", "max_val": 200}
   ]}}]
 }
 ```
