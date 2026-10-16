@@ -307,3 +307,29 @@ def test_style_dialogs_ok_and_cancel(monkeypatch, accept):
         assert c.get_span_style("window")["alpha"] == 0.7
     else:
         assert c.get_config() == {}                             # Cancel: nothing changed
+
+
+# ----- ScrollableFigure -----
+def test_scrollable_figure_zoom():
+    from matplotlib.figure import Figure
+
+    from sciwidgets.plot import ScrollableFigure
+
+    fig = Figure(figsize=(4, 2), dpi=100)
+    sf = ScrollableFigure(fig)
+    ratio = max(sf.canvas.devicePixelRatioF(), 1.0)
+    assert sf.figure is fig and sf.zoom() == (1.0, 1.0)
+    assert sf.canvas_size() == (round(400 / ratio), round(200 / ratio))
+    sf.set_zoom(2.0, 0.5)
+    assert sf.zoom() == (2.0, 0.5)
+    assert sf.canvas_size() == (round(800 / ratio), round(100 / ratio))
+    assert tuple(fig.get_size_inches()) == (8.0, 1.0)
+    sf.set_zoom(vertical=1.0)
+    assert sf.zoom() == (2.0, 1.0)
+    with pytest.raises(ValueError):
+        sf.set_zoom(0)
+    fig2 = Figure(figsize=(1, 1), dpi=100)
+    sf.set_figure(fig2)
+    assert sf.figure is fig2 and sf.zoom() == (2.0, 1.0)
+    assert sf.canvas_size() == (round(200 / ratio), round(100 / ratio))
+    sf.center()

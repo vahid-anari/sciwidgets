@@ -80,7 +80,9 @@ unit.set_value("ms")
 ```
 
 The value is the selected text. `set_value` raises `ValueError` for text that
-is not one of the items.
+is not one of the items. `set_items(items, current=None)` replaces the list
+silently: the current text is kept when it is still there, otherwise
+`current` or the first item is selected; `items()` returns the list.
 
 ## ParameterToggle
 

@@ -165,3 +165,15 @@ QTimer.singleShot(50, import_data)   # import_data ends with status.set_state("R
 
 Memory is the process's resident memory, read with
 [psutil](https://pypi.org/project/psutil/).
+
+## center_on_screen
+
+```python
+from sciwidgets.window import center_on_screen
+
+center_on_screen(win, (1400, 900), fallback=(1200, 700))
+```
+
+Resizes the window to `size` when that fits the available screen area,
+otherwise to `fallback` (90 % of the screen by default), and moves it to the
+centre of its screen.

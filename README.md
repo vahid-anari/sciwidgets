@@ -48,11 +48,12 @@ and moved into this package so other apps can share them.
 | `sciwidgets.params` (sliders) | `FloatSlider`, `IntSlider`, `ArraySlider`, `FloatRangeSlider`, `IntRangeSlider`, `MultiVariableSlider`, `SliderFeature` | [Sliders](https://github.com/vahid-anari/sciwidgets/blob/main/docs/sliders.md) |
 | `sciwidgets.params` (inputs) | `ParameterLineEdit`, `ParameterComboBox`, `ParameterToggle`, `NumericLineEdit` | [Parameter widgets](https://github.com/vahid-anari/sciwidgets/blob/main/docs/params.md) |
 | `sciwidgets.panel` | `ParameterPage`, `ParameterTabs`, `widget_from_spec`, `register_type` | [Parameter panels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/panel.md) |
-| `sciwidgets.plot` | `PlotCanvas`, `CurveSelector`, `CurveCheckBox` | [Plot canvas](https://github.com/vahid-anari/sciwidgets/blob/main/docs/plot.md) |
+| `sciwidgets.plot` | `PlotCanvas`, `ScrollableFigure`, `CurveSelector`, `CurveCheckBox` | [Plot canvas](https://github.com/vahid-anari/sciwidgets/blob/main/docs/plot.md) |
+| `sciwidgets.table` | `DataFrameModel`, `DataFrameView` (needs `pip install "sciwidgets[table]"`) | [DataFrame tables](https://github.com/vahid-anari/sciwidgets/blob/main/docs/table.md) |
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
 | `sciwidgets.splash` | `SplashScreen`, `splash_message` | [Splash screen](https://github.com/vahid-anari/sciwidgets/blob/main/docs/splash.md) |
-| `sciwidgets.window` | `MenuBarController`, `StatusBarController` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
+| `sciwidgets.window` | `MenuBarController`, `StatusBarController`, `center_on_screen` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
 | `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
 ## Install
@@ -62,7 +63,8 @@ pip install sciwidgets
 ```
 
 Requires Python 3.10+, PySide6 6.5+, Matplotlib and NumPy (installed
-automatically). A LaTeX installation is optional.
+automatically). A LaTeX installation is optional. The table widgets need
+pandas: `pip install "sciwidgets[table]"`.
 
 For development, from the repo root:
 

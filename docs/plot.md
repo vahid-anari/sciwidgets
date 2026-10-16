@@ -200,3 +200,26 @@ show_w = CurveCheckBox(canvas, "w", axis="profile.twin")         # hides the twi
 
 Both show each curve's colour and follow colour changes. `CurveSelector`
 emits `curveSelected(id)` when the user chooses; `set_current(id)` is silent.
+
+## ScrollableFigure
+
+A figure that keeps its own size inside a scroll area, for drawings that are
+taller or wider than the window (level diagrams, long time series). The
+mouse wheel scrolls; zoom factors scale the figure.
+
+```python
+from matplotlib.figure import Figure
+from sciwidgets.plot import ScrollableFigure
+
+fig = Figure(figsize=(12, 20), dpi=100)
+area = ScrollableFigure(fig)
+area.set_zoom(1.5, 1.0)       # horizontal, vertical; 1.0 = the figure's own size
+area.set_zoom(vertical=2.0)   # one factor at a time
+area.center()                 # horizontal scroll bar to the middle
+area.canvas.mpl_connect("motion_notify_event", on_move)
+area.set_figure(other_fig)    # swap the figure, zoom kept
+```
+
+The canvas size is the figure size in inches times its dpi, divided by the
+screen's device pixel ratio, times the zoom factors; `canvas_size()` returns
+it in logical pixels and `zoom()` the factors.

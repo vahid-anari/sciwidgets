@@ -116,3 +116,17 @@ def test_multi_variable_slider():
     assert w.get_index() == 1 and w.get_value() == 25
     w.set_value(30.0)
     assert w.get_arr_values()[1] == 30.0
+
+
+def test_combo_box_set_items(spy):
+    w = ParameterComboBox(label="t", items=["d", "h", "s"])
+    s = spy(w.valueChanged)
+    w.set_value("h")
+    w.set_items(["h", "m", "s"])
+    assert w.get_value() == "h" and w.items() == ["h", "m", "s"]
+    w.set_items(["a", "b"], current="b")
+    assert w.get_value() == "b"
+    w.set_items(["x", "y"])
+    assert w.get_value() == "x" and len(s) == 0
+    with pytest.raises(ValueError):
+        w.set_items([])

@@ -66,6 +66,40 @@ class ParameterComboBox(ParameterWidgetBase[str]):
             self._last_value = value
             self.valueChanged.emit(value)
 
+    def items(self) -> List[str]:
+        """Return the selectable texts in order."""
+        return [self._combo.itemText(i) for i in range(self._combo.count())]
+
+    def set_items(self, items: List[str], current: str | None = None) -> None:
+        """Replace the selectable texts without emitting ``valueChanged``.
+
+        The current text is kept when it is still in ``items``; otherwise
+        ``current`` is selected, or the first item when ``current`` is not
+        given or not in ``items``.
+
+        Args:
+            items: New ordered list of selectable string values.
+            current: Text to select when the old value is gone.
+        """
+        items = list(items)
+        if not items:
+            raise ValueError("'items' must not be empty")
+        old = self._combo.currentText()
+        self._combo.blockSignals(True)
+        try:
+            self._combo.clear()
+            for v in items:
+                self._combo.addItem(v)
+            if old in items:
+                self._combo.setCurrentIndex(items.index(old))
+            elif current is not None and current in items:
+                self._combo.setCurrentIndex(items.index(current))
+            else:
+                self._combo.setCurrentIndex(0)
+        finally:
+            self._combo.blockSignals(False)
+        self._last_value = self._combo.currentText()
+
     def get_value(self) -> str:
         """Return the currently selected combo-box text.
 

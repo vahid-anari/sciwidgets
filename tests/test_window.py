@@ -49,3 +49,19 @@ def test_math_label_renders_mathtext():
     label.set_text(r"\alpha")
     with pytest.raises(Exception):
         MathLabel(r"\frac{")
+
+
+def test_center_on_screen():
+    from PySide6.QtGui import QGuiApplication
+
+    from sciwidgets.window import center_on_screen
+
+    geo = QGuiApplication.primaryScreen().availableGeometry()
+    win = QMainWindow()
+    center_on_screen(win, (300, 200))
+    assert (win.width(), win.height()) == (300, 200)
+    assert win.x() == geo.x() + (geo.width() - 300) // 2
+    center_on_screen(win, (geo.width() + 1, 100), fallback=(250, 150))
+    assert (win.width(), win.height()) == (250, 150)
+    center_on_screen(win, (geo.width() + 1, 100))
+    assert (win.width(), win.height()) == (int(geo.width() * 0.9), int(geo.height() * 0.9))
