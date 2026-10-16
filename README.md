@@ -38,6 +38,8 @@ and moved into this package so other apps can share them.
   as plain data.
 - **Dialogs**: information, warning, error, question, rich-text and About
   dialogs.
+- **Splash screen**: your picture with the app name and version drawn on it,
+  sharp on Retina, and start-up messages from anywhere in the app.
 
 ## Components
 
@@ -49,6 +51,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.plot` | `PlotCanvas`, `CurveSelector`, `CurveCheckBox` | [Plot canvas](https://github.com/vahid-anari/sciwidgets/blob/main/docs/plot.md) |
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
+| `sciwidgets.splash` | `SplashScreen`, `splash_message` | [Splash screen](https://github.com/vahid-anari/sciwidgets/blob/main/docs/splash.md) |
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
 | `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
@@ -140,6 +143,7 @@ python -m sciwidgets.params.sliders
 python -m sciwidgets.window
 python -m sciwidgets.panel
 python -m sciwidgets.plot
+python -m sciwidgets.splash
 ```
 
 ## Versions
