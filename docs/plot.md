@@ -220,6 +220,7 @@ area.canvas.mpl_connect("motion_notify_event", on_move)
 area.set_figure(other_fig)    # swap the figure, zoom kept
 ```
 
-The canvas size is the figure size in inches times its dpi, divided by the
-screen's device pixel ratio, times the zoom factors; `canvas_size()` returns
+The canvas size is the figure size in inches times the figure's own dpi (in
+logical pixels, the same on Retina and ordinary screens), times the zoom
+factors; `canvas_size()` returns
 it in logical pixels and `zoom()` the factors.

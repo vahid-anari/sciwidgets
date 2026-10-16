@@ -29,8 +29,8 @@ class _Canvas(FigureCanvasQTAgg):
 class ScrollableFigure(QScrollArea):
     """Show a figure at its natural size, scrolled and zoomed by the user.
 
-    The canvas keeps the size given by the figure (inches × dpi, divided by
-    the device pixel ratio) times the zoom factors, so a figure larger than
+    The canvas keeps the size given by the figure (inches × the figure's own
+    dpi, in logical pixels) times the zoom factors, so a figure larger than
     the widget is scrolled rather than shrunk. The mouse wheel scrolls.
 
     Args:
@@ -66,6 +66,9 @@ class ScrollableFigure(QScrollArea):
         if old is not None:
             old.deleteLater()
         self._origin = tuple(figure.get_size_inches())
+        # Matplotlib multiplies figure.dpi by the screen's pixel ratio once the canvas is on a
+        # HiDPI screen and keeps the dpi it was created with as _original_dpi
+        self._dpi = float(getattr(figure, "_original_dpi", figure.get_dpi()))
         self._canvas = _Canvas(figure, self)
         self.setWidget(self._canvas)
         self._apply_zoom()
@@ -89,6 +92,11 @@ class ScrollableFigure(QScrollArea):
         hbar = self.horizontalScrollBar()
         hbar.setValue((hbar.minimum() + hbar.maximum()) // 2)
 
+    def showEvent(self, event) -> None:
+        # the pixel ratio is only known once the widget is on a screen
+        self._apply_zoom()
+        super().showEvent(event)
+
     def canvas_size(self) -> Tuple[int, int]:
         """Return the canvas size in logical pixels."""
         return self._canvas.width(), self._canvas.height()
@@ -98,8 +106,7 @@ class ScrollableFigure(QScrollArea):
         w_in = self._origin[0] * self._zoom[0]
         h_in = self._origin[1] * self._zoom[1]
         fig.set_size_inches(w_in, h_in, forward=True)
-        dpi = fig.get_dpi() / max(self._canvas.devicePixelRatioF(), 1.0)
-        w_px, h_px = int(round(w_in * dpi)), int(round(h_in * dpi))
+        w_px, h_px = int(round(w_in * self._dpi)), int(round(h_in * self._dpi))
         self._canvas.setMinimumSize(w_px, h_px)
         self._canvas.resize(w_px, h_px)
         self._canvas.draw_idle()

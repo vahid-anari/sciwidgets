@@ -317,7 +317,7 @@ def test_scrollable_figure_zoom():
 
     fig = Figure(figsize=(4, 2), dpi=100)
     sf = ScrollableFigure(fig)
-    ratio = max(sf.canvas.devicePixelRatioF(), 1.0)
+    ratio = 1.0  # logical pixels = inches × the figure's own dpi, on any screen
     assert sf.figure is fig and sf.zoom() == (1.0, 1.0)
     assert sf.canvas_size() == (round(400 / ratio), round(200 / ratio))
     sf.set_zoom(2.0, 0.5)
@@ -333,3 +333,20 @@ def test_scrollable_figure_zoom():
     assert sf.figure is fig2 and sf.zoom() == (2.0, 1.0)
     assert sf.canvas_size() == (round(200 / ratio), round(100 / ratio))
     sf.center()
+
+
+def test_scrollable_figure_hidpi_dpi():
+    """On a Retina screen Matplotlib doubles figure.dpi; the size must still use the original dpi."""
+    from matplotlib.figure import Figure
+
+    from sciwidgets.plot import ScrollableFigure
+
+    fig = Figure(figsize=(12, 6), dpi=100)
+    fig._original_dpi = 100
+    sf = ScrollableFigure(fig)
+    fig.dpi = 200  # what the Qt canvas does on a pixel ratio of 2
+    sf.set_zoom(1.0, 1.0)
+    assert sf.canvas_size() == (1200, 600)
+    sf.show()
+    assert sf.canvas_size() == (1200, 600)
+
