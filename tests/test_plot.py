@@ -241,3 +241,69 @@ def test_span_dialog_preview_and_cancel():
     assert c.get_span_style("window")["center_linewidth"] == 1.5
     plain = SpanStyleDialog("Band", c.get_span_style("band"), c.default_span_style("band"))
     assert "center_color" not in plain.style()                 # no centre-line section
+
+
+# ----- live preview in the curve and grid dialogs (0.8.1) -----
+
+def test_curve_and_grid_dialog_preview():
+    from sciwidgets.plot._style_dialog import CurveStyleDialog, GridStyleDialog
+
+    seen = []
+    c = make_canvas()
+    dialog = CurveStyleDialog("F", c.get_curve_style("flux"), c.default_curve_style("flux"),
+                              preview=seen.append)
+    assert seen == []                                           # filling the editors is no change
+    dialog._width.setValue(3.0)
+    assert seen[-1]["linewidth"] == 3.0
+    dialog._reset()
+    assert seen[-1] == c.default_curve_style("flux")
+
+    seen.clear()
+    grid = GridStyleDialog(c.get_grid_style(), c.default_grid_style(), preview=seen.append)
+    assert seen == []
+    grid._alpha.setValue(0.8)
+    assert seen[-1]["alpha"] == 0.8
+
+
+@pytest.mark.parametrize("accept", [True, False])
+def test_style_dialogs_ok_and_cancel(monkeypatch, accept):
+    """The canvas previews each change and keeps it on OK, or puts the old style back on Cancel."""
+    from PySide6.QtWidgets import QDialog
+
+    import sciwidgets.plot.canvas as canvas_module
+
+    def fake(cls, change):
+        class Fake(cls):
+            def exec(self):
+                change(self)                                    # the user edits a field
+                return QDialog.Accepted if accept else QDialog.Rejected
+        return Fake
+
+    c = make_canvas()
+    previewed = {}
+
+    def curve_change(d):
+        d._width.setValue(4.0)
+        previewed["curve"] = c.get_curve_style("flux")["linewidth"]
+
+    def grid_change(d):
+        d._width.setValue(2.5)
+        previewed["grid"] = c.get_grid_style()["linewidth"]
+
+    def span_change(d):
+        d._alpha.setValue(0.7)
+        previewed["span"] = c.get_span_style("window")["alpha"]
+
+    monkeypatch.setattr(canvas_module, "CurveStyleDialog", fake(canvas_module.CurveStyleDialog, curve_change))
+    monkeypatch.setattr(canvas_module, "GridStyleDialog", fake(canvas_module.GridStyleDialog, grid_change))
+    monkeypatch.setattr(canvas_module, "SpanStyleDialog", fake(canvas_module.SpanStyleDialog, span_change))
+    c._edit_style("flux")
+    c._edit_grid_style()
+    c._edit_span_style("window")
+    assert previewed == {"curve": 4.0, "grid": 2.5, "span": 0.7}  # shown while the dialog is open
+    if accept:
+        assert c.get_curve_style("flux")["linewidth"] == 4.0
+        assert c.get_grid_style()["linewidth"] == 2.5
+        assert c.get_span_style("window")["alpha"] == 0.7
+    else:
+        assert c.get_config() == {}                             # Cancel: nothing changed

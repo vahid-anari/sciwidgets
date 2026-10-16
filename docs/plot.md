@@ -169,8 +169,8 @@ every curve's style (colour, line, width, marker, size) and visibility, grids,
 a grid style for the whole figure (line, width, opacity; the colours stay
 automatic), the legend, and the style of the spans on the panel ("<name>
 style…", or a "Span style" submenu when there are several). Curves and
-spans show their colour swatch. The span dialog shows each change at once;
-Cancel puts the old style back.
+spans show their colour swatch. The style dialogs (curve, grid, span) show
+each change at once; Cancel puts the old style back.
 `context_menu=False` turns the menu off.
 
 `get_config()` returns only what differs from the description, as plain data

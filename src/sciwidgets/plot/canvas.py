@@ -1133,18 +1133,36 @@ class PlotCanvas(FigureCanvasQTAgg):
     def _edit_style(self, curve_id: str) -> None:
         """Open the style dialog for a curve."""
         curve = self._curves[curve_id]
-        dialog = CurveStyleDialog(curve.name, self._style_of(curve_id),
-                                  self._default_styles[curve_id], self)
+        before = self._style_of(curve_id)
+
+        def preview(style: Dict[str, Any]) -> None:
+            self.set_curve_style(curve_id, **style)
+            self.redraw()
+
+        dialog = CurveStyleDialog(curve.name, before, self._default_styles[curve_id], self,
+                                  preview=preview)
         if dialog.exec() == QDialog.Accepted:
             self.set_curve_style(curve_id, **dialog.style())
             self._user_changed()
+        else:
+            self.set_curve_style(curve_id, **before)
+            self.redraw()
 
     def _edit_grid_style(self) -> None:
         """Open the grid style dialog (applies to all panels)."""
-        dialog = GridStyleDialog(self.get_grid_style(), self.default_grid_style(), self)
+        before = dict(self._grid_style)
+
+        def preview(style: Dict[str, Any]) -> None:
+            self.set_grid_style(**style)
+            self.redraw()
+
+        dialog = GridStyleDialog(self.get_grid_style(), self.default_grid_style(), self, preview=preview)
         if dialog.exec() == QDialog.Accepted:
             self.set_grid_style(**dialog.style())
             self._user_changed()
+        else:
+            self.set_grid_style(**before)
+            self.redraw()
 
     def _edit_span_style(self, marker_id: str) -> None:
         """Open the style dialog for a span, with a live preview; Cancel restores the old style."""

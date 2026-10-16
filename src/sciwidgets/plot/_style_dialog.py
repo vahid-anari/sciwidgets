@@ -33,137 +33,6 @@ def _pick(combo: QComboBox, table: Dict[str, str], value: str) -> None:
     combo.setCurrentIndex(combo.count() - 1)
 
 
-class CurveStyleDialog(QDialog):
-    """Edit colour, line style, line width, marker and marker size of a curve.
-
-    "Reset" restores the style from the plot description.
-    """
-
-    def __init__(self, name: str, style: Dict[str, Any], default: Dict[str, Any],
-                 parent: Optional[QWidget] = None) -> None:
-        """Build the dialog.
-
-        Args:
-            name: Curve name shown in the title.
-            style: Current style (``get_curve_style`` format).
-            default: Style from the description, used by "Reset".
-            parent: Parent widget.
-        """
-        super().__init__(parent)
-        self.setWindowTitle(f"Style: {name}")
-        self._default = dict(default)
-        self._color = style["color"]
-
-        self._color_btn = QPushButton()
-        self._color_btn.clicked.connect(self._choose_color)
-        self._line = QComboBox()
-        for label, value in LINE_STYLES.items():
-            self._line.addItem(label, value)
-        self._width = QDoubleSpinBox(minimum=0.0, maximum=20.0, singleStep=0.25, decimals=2)
-        self._marker = QComboBox()
-        for label, value in MARKERS.items():
-            self._marker.addItem(label, value)
-        self._msize = QDoubleSpinBox(minimum=0.0, maximum=40.0, singleStep=0.5, decimals=1)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.Reset).clicked.connect(lambda: self._show(self._default))
-
-        form = QFormLayout(self)
-        form.addRow("Colour:", self._color_btn)
-        form.addRow("Line:", self._line)
-        form.addRow("Line width:", self._width)
-        form.addRow("Marker:", self._marker)
-        form.addRow("Marker size:", self._msize)
-        form.addRow(buttons)
-        self._show(style)
-
-    def _show(self, style: Dict[str, Any]) -> None:
-        """Put a style into the editors."""
-        self._set_color(style["color"])
-        _pick(self._line, LINE_STYLES, style["linestyle"])
-        self._width.setValue(style["linewidth"])
-        _pick(self._marker, MARKERS, style["marker"])
-        self._msize.setValue(style["markersize"])
-
-    def _set_color(self, color: str) -> None:
-        """Remember a colour and paint the button with it."""
-        self._color = mcolors.to_hex(color)
-        self._color_btn.setText(self._color)
-        text = "#000000" if QColor(self._color).lightness() > 128 else "#ffffff"
-        self._color_btn.setStyleSheet(f"background-color: {self._color}; color: {text};")
-
-    def _choose_color(self) -> None:
-        """Open the colour picker."""
-        chosen = QColorDialog.getColor(QColor(self._color), self, "Curve colour")
-        if chosen.isValid():
-            self._set_color(chosen.name())
-
-    def style(self) -> Dict[str, Any]:
-        """Return the edited style."""
-        return {
-            "color": self._color,
-            "linestyle": self._line.currentData(),
-            "linewidth": float(self._width.value()),
-            "marker": self._marker.currentData(),
-            "markersize": float(self._msize.value()),
-        }
-
-
-class GridStyleDialog(QDialog):
-    """Edit line style, width and opacity of all grid lines (colours stay automatic).
-
-    "Reset" restores the style from the plot description.
-    """
-
-    def __init__(self, style: Dict[str, Any], default: Dict[str, Any],
-                 parent: Optional[QWidget] = None) -> None:
-        """Build the dialog.
-
-        Args:
-            style: Current grid style (``linestyle``, ``linewidth``, ``alpha``).
-            default: Style from the description, used by "Reset".
-            parent: Parent widget.
-        """
-        super().__init__(parent)
-        self.setWindowTitle("Grid style")
-        self._default = dict(default)
-
-        self._line = QComboBox()
-        for label, value in LINE_STYLES.items():
-            if value != "None":
-                self._line.addItem(label, value)
-        self._width = QDoubleSpinBox(minimum=0.1, maximum=5.0, singleStep=0.1, decimals=2)
-        self._alpha = QDoubleSpinBox(minimum=0.05, maximum=1.0, singleStep=0.05, decimals=2)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.Reset).clicked.connect(lambda: self._show(self._default))
-
-        form = QFormLayout(self)
-        form.addRow("Line:", self._line)
-        form.addRow("Line width:", self._width)
-        form.addRow("Opacity:", self._alpha)
-        form.addRow(buttons)
-        self._show(style)
-
-    def _show(self, style: Dict[str, Any]) -> None:
-        """Put a style into the editors."""
-        _pick(self._line, {k: v for k, v in LINE_STYLES.items() if v != "None"}, style["linestyle"])
-        self._width.setValue(style["linewidth"])
-        self._alpha.setValue(style["alpha"])
-
-    def style(self) -> Dict[str, Any]:
-        """Return the edited style."""
-        return {
-            "linestyle": self._line.currentData(),
-            "linewidth": float(self._width.value()),
-            "alpha": float(self._alpha.value()),
-        }
-
-
 class _ColorButton(QPushButton):
     """A button showing a colour; clicking it opens the colour picker."""
 
@@ -189,6 +58,165 @@ class _ColorButton(QPushButton):
         if chosen.isValid():
             self.set_color(chosen.name())
             self._on_change()
+
+
+class CurveStyleDialog(QDialog):
+    """Edit colour, line style, line width, marker and marker size of a curve.
+
+    Every change is shown at once through ``preview``; the caller restores the
+    old style when the dialog is cancelled. "Reset" restores the style from
+    the plot description.
+    """
+
+    def __init__(self, name: str, style: Dict[str, Any], default: Dict[str, Any],
+                 parent: Optional[QWidget] = None,
+                 preview: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
+        """Build the dialog.
+
+        Args:
+            name: Curve name shown in the title.
+            style: Current style (``get_curve_style`` format).
+            default: Style from the description, used by "Reset".
+            parent: Parent widget.
+            preview: Called with the edited style after every change.
+        """
+        super().__init__(parent)
+        self.setWindowTitle(f"Style: {name}")
+        self._default = dict(default)
+        self._preview = preview
+        self._showing = False
+
+        self._color_btn = _ColorButton("Curve colour", self._changed)
+        self._line = QComboBox()
+        for label, value in LINE_STYLES.items():
+            self._line.addItem(label, value)
+        self._width = QDoubleSpinBox(minimum=0.0, maximum=20.0, singleStep=0.25, decimals=2)
+        self._marker = QComboBox()
+        for label, value in MARKERS.items():
+            self._marker.addItem(label, value)
+        self._msize = QDoubleSpinBox(minimum=0.0, maximum=40.0, singleStep=0.5, decimals=1)
+        for spin in (self._width, self._msize):
+            spin.valueChanged.connect(self._changed)
+        for combo in (self._line, self._marker):
+            combo.currentIndexChanged.connect(self._changed)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.Reset).clicked.connect(self._reset)
+
+        form = QFormLayout(self)
+        form.addRow("Colour:", self._color_btn)
+        form.addRow("Line:", self._line)
+        form.addRow("Line width:", self._width)
+        form.addRow("Marker:", self._marker)
+        form.addRow("Marker size:", self._msize)
+        form.addRow(buttons)
+        self._show(style)
+
+    def _show(self, style: Dict[str, Any]) -> None:
+        """Put a style into the editors (without previews for each field)."""
+        self._showing = True
+        try:
+            self._color_btn.set_color(style["color"])
+            _pick(self._line, LINE_STYLES, style["linestyle"])
+            self._width.setValue(style["linewidth"])
+            _pick(self._marker, MARKERS, style["marker"])
+            self._msize.setValue(style["markersize"])
+        finally:
+            self._showing = False
+
+    def _reset(self) -> None:
+        self._show(self._default)
+        self._changed()
+
+    def _changed(self, *_: Any) -> None:
+        if not self._showing and self._preview is not None:
+            self._preview(self.style())
+
+    def style(self) -> Dict[str, Any]:
+        """Return the edited style."""
+        return {
+            "color": self._color_btn.color(),
+            "linestyle": self._line.currentData(),
+            "linewidth": float(self._width.value()),
+            "marker": self._marker.currentData(),
+            "markersize": float(self._msize.value()),
+        }
+
+
+class GridStyleDialog(QDialog):
+    """Edit line style, width and opacity of all grid lines (colours stay automatic).
+
+    Every change is shown at once through ``preview``; the caller restores the
+    old style when the dialog is cancelled. "Reset" restores the style from
+    the plot description.
+    """
+
+    def __init__(self, style: Dict[str, Any], default: Dict[str, Any],
+                 parent: Optional[QWidget] = None,
+                 preview: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
+        """Build the dialog.
+
+        Args:
+            style: Current grid style (``linestyle``, ``linewidth``, ``alpha``).
+            default: Style from the description, used by "Reset".
+            parent: Parent widget.
+            preview: Called with the edited style after every change.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Grid style")
+        self._default = dict(default)
+        self._preview = preview
+        self._showing = False
+
+        self._line = QComboBox()
+        for label, value in LINE_STYLES.items():
+            if value != "None":
+                self._line.addItem(label, value)
+        self._width = QDoubleSpinBox(minimum=0.1, maximum=5.0, singleStep=0.1, decimals=2)
+        self._alpha = QDoubleSpinBox(minimum=0.05, maximum=1.0, singleStep=0.05, decimals=2)
+        for spin in (self._width, self._alpha):
+            spin.valueChanged.connect(self._changed)
+        self._line.currentIndexChanged.connect(self._changed)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel | QDialogButtonBox.Reset)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.Reset).clicked.connect(self._reset)
+
+        form = QFormLayout(self)
+        form.addRow("Line:", self._line)
+        form.addRow("Line width:", self._width)
+        form.addRow("Opacity:", self._alpha)
+        form.addRow(buttons)
+        self._show(style)
+
+    def _show(self, style: Dict[str, Any]) -> None:
+        """Put a style into the editors (without previews for each field)."""
+        self._showing = True
+        try:
+            _pick(self._line, {k: v for k, v in LINE_STYLES.items() if v != "None"}, style["linestyle"])
+            self._width.setValue(style["linewidth"])
+            self._alpha.setValue(style["alpha"])
+        finally:
+            self._showing = False
+
+    def _reset(self) -> None:
+        self._show(self._default)
+        self._changed()
+
+    def _changed(self, *_: Any) -> None:
+        if not self._showing and self._preview is not None:
+            self._preview(self.style())
+
+    def style(self) -> Dict[str, Any]:
+        """Return the edited style."""
+        return {
+            "linestyle": self._line.currentData(),
+            "linewidth": float(self._width.value()),
+            "alpha": float(self._alpha.value()),
+        }
 
 
 class SpanStyleDialog(QDialog):
