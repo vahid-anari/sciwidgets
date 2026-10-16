@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sciwidgets"
-version = "0.10.3"
+version = "0.10.4"
 description = "PySide6 widgets for scientific desktop apps: LaTeX labels, sliders, parameter panels, Matplotlib plot canvas, DataFrame tables and dialogs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,7 +29,10 @@ classifiers = [
     "Topic :: Software Development :: User Interfaces",
 ]
 dependencies = [
-    "PySide6>=6.5,<7",
+    # PySide6 6.12.0 loses a reference to None each time a Python table model returns None from data();
+    # on Python before 3.12 (where None is not immortal) that crashes the interpreter
+    "PySide6>=6.5,<7; python_version >= '3.12'",
+    "PySide6>=6.5,<7,!=6.12.0; python_version < '3.12'",
     "matplotlib>=3.7",
     "numpy>=1.24",
     "psutil>=5.9",
