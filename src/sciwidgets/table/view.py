@@ -339,6 +339,7 @@ class DataFrameView(QTableView):
         current = QColor(self.column_color(column, kind=kind) or fallback)
         what = "Color" if kind == "background" else "Text color"
         color = QColorDialog.getColor(current, self, f"{what} of column '{column}'")
+        self._reactivate()
         if color.isValid():
             self._user_set_color(column, color, kind=kind)
 
@@ -346,8 +347,17 @@ class DataFrameView(QTableView):
         dlg = QFontDialog(self._resolved_font(), self)
         dlg.setWindowTitle("Table font")
         dlg.setOption(QFontDialog.DontUseNativeDialog, True)
-        if dlg.exec():
+        accepted = dlg.exec()
+        self._reactivate()
+        if accepted:
             self._user_set_font(dlg.selectedFont())
+
+    def _reactivate(self) -> None:
+        # the native colour panel on macOS hands focus back to the application's first window,
+        # so bring the table's own window to the front again
+        window = self.window()
+        window.raise_()
+        window.activateWindow()
 
     def _resolved_font(self) -> QFont:
         """The font to start the dialog from: the chosen table font, else the application font resolved

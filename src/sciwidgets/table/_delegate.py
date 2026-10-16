@@ -52,7 +52,9 @@ class RichTextDelegate(QStyledItemDelegate):
         painter.setClipRect(rect)
         painter.translate(rect.x(), rect.y() + (rect.height() - doc.size().height()) / 2)
         if opt.state & QStyle.State_Selected:
-            color = opt.palette.color(QPalette.HighlightedText)
+            # same colour group as the plain cells: Inactive when the table has no focus
+            group = QPalette.Active if opt.state & QStyle.State_Active else QPalette.Inactive
+            color = opt.palette.color(group, QPalette.HighlightedText)
         else:
             foreground = index.data(Qt.ForegroundRole)
             color = foreground.color() if foreground is not None else opt.palette.color(QPalette.Text)
