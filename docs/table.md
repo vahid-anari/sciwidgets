@@ -31,6 +31,7 @@ view.setModel(model)
 |----------|---------|
 | `formats` | per column, a format string (`"{:,.3f}"`) or a callable taking the value and returning text; other columns show `str(value)` |
 | `backgrounds` | `{column: color}` or a callable taking the column name and returning a color or `None` |
+| `row_backgrounds` | callable taking a row (`pandas.Series`) and returning its background colour or `None`; wins over the column defaults, a user column colour wins over it |
 | `alignments` | `"left"`, `"center"` or `"right"` per column, as a dict or a callable taking the column name (`None` keeps the rule below) |
 | `headers` | header text per column; the column name by default |
 

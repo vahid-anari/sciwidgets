@@ -390,3 +390,24 @@ def test_alignment_overrides_and_config(spy):
     assert sub.parent() is menu
     checked = [a.text() for a in sub.actions() if a.isChecked()]
     assert checked == ["Right"]
+
+
+def test_row_backgrounds():
+    from PySide6.QtCore import Qt
+
+    df = pd.DataFrame({"kind": ["a", "b", "a"], "x": [3, 1, 2]})
+    v = DataFrameView()
+    v.set_frame(df, row_backgrounds=lambda row: "#ff0000" if row["kind"] == "a" else None,
+                backgrounds={"x": "#0000ff"})
+    m = v.model_()
+    assert m.data(m.index(0, 0), Qt.BackgroundRole).color().name() == "#ff0000"
+    assert m.data(m.index(1, 0), Qt.BackgroundRole) is None
+    assert m.data(m.index(1, 1), Qt.BackgroundRole).color().name() == "#0000ff"
+    assert m.data(m.index(0, 1), Qt.BackgroundRole).color().name() == "#ff0000"
+    v.set_column_color("x", "#00ff00")
+    assert m.data(m.index(0, 1), Qt.BackgroundRole).color().name() == "#00ff00"
+    v.sortByColumn(1, Qt.AscendingOrder)
+    assert list(v.frame()["kind"]) == ["b", "a", "a"]
+    assert m.data(m.index(0, 0), Qt.BackgroundRole) is None
+    assert m.data(m.index(1, 0), Qt.BackgroundRole).color().name() == "#ff0000"
+

@@ -13,6 +13,7 @@ Formatter = Union[str, Callable[[Any], str]]
 Color = Union[str, QColor]
 Backgrounds = Union[Dict[str, Color], Callable[[str], Optional[Color]]]
 Alignments = Union[Dict[str, str], Callable[[str], Optional[str]]]
+RowColors = Callable[[pd.Series], Optional[Color]]
 _ALIGN = {
     "left": int(Qt.AlignLeft | Qt.AlignVCenter),
     "center": int(Qt.AlignHCenter | Qt.AlignVCenter),
@@ -35,6 +36,9 @@ class DataFrameModel(QAbstractTableModel):
             callable taking the column name and returning a color (or ``None``
             for the default background).
         text_colors: Per-column text color, same forms as ``backgrounds``.
+        row_backgrounds: Callable taking a row (``pandas.Series``) and
+            returning its background color or ``None``. It wins over the
+            column defaults; a colour the user set on a column wins over it.
         alignments: Per-column text alignment, ``"left"``, ``"center"`` or
             ``"right"``, as a dict or a callable taking the column name
             (``None`` keeps the rule: right for numeric columns and columns
@@ -50,6 +54,7 @@ class DataFrameModel(QAbstractTableModel):
             formats: Optional[Dict[str, Formatter]] = None,
             backgrounds: Optional[Backgrounds] = None,
             text_colors: Optional[Backgrounds] = None,
+            row_backgrounds: Optional[RowColors] = None,
             alignments: Optional[Alignments] = None,
             headers: Optional[Dict[str, str]] = None,
             parent: Optional[QObject] = None,
@@ -59,6 +64,8 @@ class DataFrameModel(QAbstractTableModel):
         for col, fmt in (formats or {}).items():
             self._formats[col] = fmt.format if isinstance(fmt, str) else fmt
         self._defaults = {"background": backgrounds or {}, "text": text_colors or {}}
+        self._row_backgrounds = row_backgrounds
+        self._row_brushes: Dict[int, Optional[QBrush]] = {}
         self._alignments = alignments or {}
         self._alignment_overrides: Dict[str, str] = {}
         self._headers = dict(headers or {})
@@ -76,6 +83,7 @@ class DataFrameModel(QAbstractTableModel):
         self._df = df
         self._columns = [str(c) for c in df.columns]
         self._alignment = [self._column_alignment(col, df[c]) for col, c in zip(self._columns, df.columns)]
+        self._row_brushes = {}
         for cache in self._brush_cache.values():
             cache.clear()
         self.endResetModel()
@@ -104,6 +112,7 @@ class DataFrameModel(QAbstractTableModel):
                 key = lambda s: pd.to_numeric(s, errors="coerce")  # noqa: E731 - text that is all numbers
         self.beginResetModel()
         self._df = self._df.sort_values(by=name, ascending=order == Qt.AscendingOrder, kind="stable", key=key)
+        self._row_brushes = {}
         self.endResetModel()
 
     # ----- colors -----
@@ -204,6 +213,10 @@ class DataFrameModel(QAbstractTableModel):
         if role == Qt.TextAlignmentRole:
             return self._alignment[index.column()]
         if role == Qt.BackgroundRole:
+            if self._row_backgrounds is not None and col not in self._overrides["background"]:
+                row_brush = self._row_brush(index.row())
+                if row_brush is not None:
+                    return row_brush
             return self._brush("background", col)
         if role == Qt.ForegroundRole:
             return self._brush("text", col)
@@ -227,6 +240,12 @@ class DataFrameModel(QAbstractTableModel):
         if wanted not in _ALIGN:
             raise ValueError(f"alignment of column {col!r} must be 'left', 'center' or 'right', not {wanted!r}")
         return _ALIGN[wanted]
+
+    def _row_brush(self, row: int) -> Optional[QBrush]:
+        if row not in self._row_brushes:
+            color = self._row_backgrounds(self._df.iloc[row])
+            self._row_brushes[row] = QBrush(QColor(color)) if color is not None else None
+        return self._row_brushes[row]
 
     def _brush(self, kind: str, col: str) -> Optional[QBrush]:
         cache = self._brush_cache[kind]
