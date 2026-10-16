@@ -31,10 +31,11 @@ view.setModel(model)
 |----------|---------|
 | `formats` | per column, a format string (`"{:,.3f}"`) or a callable taking the value and returning text; other columns show `str(value)` |
 | `backgrounds` | `{column: color}` or a callable taking the column name and returning a color or `None` |
+| `alignments` | `"left"`, `"center"` or `"right"` per column, as a dict or a callable taking the column name (`None` keeps the rule below) |
 | `headers` | header text per column; the column name by default |
 
-Cells of numeric columns, and of columns that have a format, are
-right-aligned; the others left. Row headers count from 1.
+Without an alignment, cells of numeric columns, and of columns that have a
+format, are right-aligned; the others left. Row headers count from 1.
 
 `set_frame(df)` replaces the data and keeps the formats, backgrounds and
 headers; `frame()` returns the DataFrame; `columns()` the column names.
@@ -78,8 +79,9 @@ view.set_frame(df,
 ## Sorting
 
 A click on a column header sorts the rows by that column, a second click
-reverses the order (`DataFrameView(sortable=False)` turns this off). The
-sort is applied to the DataFrame itself, so `frame()`, `visible_frame()` and
+reverses the order (`DataFrameView(sortable=False)` turns this off). A text
+column whose values are all numbers (a CSV read with `dtype=str`) is sorted
+numerically. The sort is applied to the DataFrame itself, so `frame()`, `visible_frame()` and
 `export_csv` follow it, and a later `set_frame` keeps the sort column.
 
 ## Header menu, colors, font and config
@@ -93,12 +95,15 @@ the `backgrounds` given to `set_frame` for that column and survives later
 the text of that column (`text_colors` in `set_frame`, same forms as
 `backgrounds`; API with `kind="text"`). *Font…* opens a font dialog for
 cells and headers (`set_table_font(font | None)`, `table_font()`);
-*Default Font* returns to the application font.
+*Default Font* returns to the application font. *Alignment ▸ Left /
+Center / Right / Default* overrides the alignment of that column
+(`set_column_alignment(column, "left" | "center" | "right" | None)`,
+`column_alignment(column)`).
 
 The view stores nothing itself. What the user changed comes back from
 `get_config()` — `{"backgrounds": {column: "#rrggbb" | None}, "text_colors":
-{column: "#rrggbb" | None}, "visible_columns": [...] | None, "font":
-"<QFont.toString()>" | None}` (`None` = no color / default font) — and `configChanged(dict)` is emitted on every user change,
+{column: "#rrggbb" | None}, "alignments": {column: "left" | "center" | "right"},
+"visible_columns": [...] | None, "font": "<QFont.toString()>" | None}` (`None` = no color / default font) — and `configChanged(dict)` is emitted on every user change,
 so the app can keep it in `QSettings` and restore it with `set_config()`
 (silent; unknown keys ignored). Programmatic counterparts:
 `set_column_color(column, color | None, kind="background" | "text")`,

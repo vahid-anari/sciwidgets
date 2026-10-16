@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import html
+
 from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QPainter, QTextDocument, QTextOption
 from PySide6.QtWidgets import QHeaderView, QStyle, QStyleOptionHeader, QWidget
@@ -12,10 +14,17 @@ def is_rich_text(text: str) -> bool:
     return "<" in text and ">" in text or "&" in text and ";" in text
 
 
+def as_html(text: str) -> str:
+    """HTML for a header label: rich text as is, plain text escaped with ``\\n`` as line breaks."""
+    return text if is_rich_text(text) else html.escape(text).replace("\n", "<br>")
+
+
 class RichHeaderView(QHeaderView):
     """Horizontal header whose labels may be HTML (``<sup>``, ``<sub>``, ``&tau;``, ``<br>``).
 
-    Plain labels (with ``\\n`` for line breaks) are drawn by the base class.
+    Plain labels (with ``\\n`` for line breaks) go through the same path, so
+    every section follows the header font (Qt's own painting keeps the
+    style's font once an application style sheet is set).
     """
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -36,19 +45,15 @@ class RichHeaderView(QHeaderView):
 
     def text_size(self, text: str) -> QSize:
         """Size of ``text`` as it would be drawn (plain or rich)."""
-        if is_rich_text(text):
-            doc = self._document(text)
-            width = doc.idealWidth()
-            doc.setTextWidth(width)
-            return QSize(int(width + 0.5), int(doc.size().height() + 0.5))
-        fm = self.fontMetrics()
-        lines = text.split("\n")
-        return QSize(max(fm.horizontalAdvance(line) for line in lines), fm.lineSpacing() * len(lines))
+        doc = self._document(as_html(text))
+        width = doc.idealWidth()
+        doc.setTextWidth(width)
+        return QSize(int(width + 0.5), int(doc.size().height() + 0.5))
 
     def sectionSizeFromContents(self, logical_index: int) -> QSize:
         model = self.model()
         text = model.headerData(logical_index, Qt.Horizontal, Qt.DisplayRole) if model is not None else None
-        if text is None or not is_rich_text(str(text)):
+        if text is None:
             return super().sectionSizeFromContents(logical_index)
         size = self.text_size(str(text))
         margin = self.style().pixelMetric(QStyle.PM_HeaderMargin, None, self)
@@ -66,7 +71,7 @@ class RichHeaderView(QHeaderView):
     def paintSection(self, painter: QPainter, rect: QRect, logical_index: int) -> None:
         model = self.model()
         text = model.headerData(logical_index, Qt.Horizontal, Qt.DisplayRole) if model is not None else None
-        if text is None or not is_rich_text(str(text)):
+        if text is None:
             super().paintSection(painter, rect, logical_index)
             return
         painter.save()
@@ -94,7 +99,7 @@ class RichHeaderView(QHeaderView):
         self.style().drawControl(QStyle.CE_Header, opt, painter, self)
         painter.restore()
         text_rect = rect.adjusted(0, 0, -self.indicator_width(), 0) if opt.sortIndicator else rect
-        doc = self._document(str(text), text_rect.width())
+        doc = self._document(as_html(str(text)), text_rect.width())
         painter.save()
         painter.translate(text_rect.x(), text_rect.y() + (text_rect.height() - doc.size().height()) / 2)
         doc.drawContents(painter)

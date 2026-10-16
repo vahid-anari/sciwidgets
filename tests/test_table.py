@@ -117,8 +117,8 @@ def test_column_colors_and_config(spy):
     v.restore_column_color("U-S J")
     assert v.column_color("U-S J") == "#d2b48c"
     v.set_visible_columns(["nu"])
-    assert v.get_config() == {"backgrounds": {"nu": "#112233"}, "text_colors": {}, "visible_columns": ["nu"],
-                              "font": None}
+    assert v.get_config() == {"backgrounds": {"nu": "#112233"}, "text_colors": {}, "alignments": {},
+                              "visible_columns": ["nu"], "font": None}
     v.set_frame(frame())
     assert v.column_color("nu") == "#112233"
     v.reset_colors()
@@ -153,8 +153,8 @@ def test_header_menu_hook():
     texts = [a.text() for a in menu.actions() if a.text()]
     assert seen == ["nu"]
     assert texts == ["Column Color…", "No Column Color", "Default Column Color", "Text Color…",
-                     "Default Text Color", "Hide This Column", "Choose Columns…", "Reset Colors", "Font…",
-                     "Default Font", "Extra"]
+                     "Default Text Color", "Alignment", "Hide This Column", "Choose Columns…", "Reset Colors",
+                     "Font…", "Default Font", "Extra"]
     assert menu.actions()[1].isEnabled() and not menu.actions()[2].isEnabled()
     v.set_column_color("nu", None)
     menu = v.header_menu("nu")
@@ -326,3 +326,67 @@ def test_rich_header_sort_indicator_and_width():
     v2 = DataFrameView(sortable=False)
     v2.set_frame(pd.DataFrame({"t": [1.0]}))
     assert v2.horizontalHeader().indicator_width() == 0
+
+
+def test_sort_numeric_strings():
+    from PySide6.QtCore import Qt
+
+    v = DataFrameView()
+    v.set_frame(pd.DataFrame({"tau": ["1.2e+02", "9.9e-05", "3"], "name": ["b", "a", "c"]}))
+    v.sortByColumn(0, Qt.AscendingOrder)
+    assert list(v.frame()["tau"]) == ["9.9e-05", "3", "1.2e+02"]
+    v.sortByColumn(1, Qt.AscendingOrder)
+    assert list(v.frame()["name"]) == ["a", "b", "c"]
+    v.set_frame(pd.DataFrame({"j": ["3/2", "1/2", "10"]}))
+    v.sortByColumn(0, Qt.AscendingOrder)
+    assert list(v.frame()["j"]) == ["1/2", "10", "3/2"]
+
+
+def test_plain_headers_follow_the_font():
+    from PySide6.QtGui import QFont
+
+    v = DataFrameView()
+    v.set_frame(pd.DataFrame({"DoF": [1], "Species": ["OH"]}))
+    header = v.horizontalHeader()
+    h0 = header.text_size("Species").height()
+    big = QFont(v.font())
+    big.setPointSize(v.font().pointSize() + 10)
+    v.set_table_font(big)
+    assert header.text_size("Species").height() > h0
+    assert header.text_size("a\nb").height() > header.text_size("a").height()
+    assert header.text_size("<b>x</b>").width() < header.text_size("&lt;b&gt;x&lt;/b&gt;").width()
+
+
+def test_alignments():
+    m = DataFrameModel(frame(), alignments={"name": "center", "U-S J": "left"})
+    assert m.data(m.index(0, 2), Qt.TextAlignmentRole) == int(Qt.AlignHCenter | Qt.AlignVCenter)
+    assert m.data(m.index(0, 1), Qt.TextAlignmentRole) == int(Qt.AlignLeft | Qt.AlignVCenter)
+    assert m.data(m.index(0, 0), Qt.TextAlignmentRole) == int(Qt.AlignRight | Qt.AlignVCenter)
+    m2 = DataFrameModel(frame(), alignments=lambda c: "right" if c != "name" else None)
+    assert m2.data(m2.index(0, 1), Qt.TextAlignmentRole) == int(Qt.AlignRight | Qt.AlignVCenter)
+    assert m2.data(m2.index(0, 2), Qt.TextAlignmentRole) == int(Qt.AlignLeft | Qt.AlignVCenter)
+    with pytest.raises(ValueError):
+        DataFrameModel(frame(), alignments={"name": "middle"})
+
+
+def test_alignment_overrides_and_config(spy):
+    v = DataFrameView()
+    v.set_column_alignment("name", "center")
+    v.set_frame(frame())
+    assert v.column_alignment("name") == "center" and v.column_alignment("nu") == "right"
+    s = spy(v.configChanged)
+    v._user_set_alignment("nu", "left")
+    assert v.column_alignment("nu") == "left" and s.calls[-1][0]["alignments"] == {"name": "center", "nu": "left"}
+    v.set_frame(frame())
+    assert v.column_alignment("nu") == "left"
+    v.set_column_alignment("nu", None)
+    assert v.column_alignment("nu") == "right"
+    v.set_config({"alignments": {"U-S J": "center"}})
+    assert v.column_alignment("U-S J") == "center" and v.column_alignment("name") == "left"
+    with pytest.raises(ValueError):
+        v.set_column_alignment("nu", "middle")
+    menu = v.header_menu("nu")
+    sub = [a for a in menu.actions() if a.text() == "Alignment"][0].menu()
+    assert sub.parent() is menu
+    checked = [a.text() for a in sub.actions() if a.isChecked()]
+    assert checked == ["Right"]

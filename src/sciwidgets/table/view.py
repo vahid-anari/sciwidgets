@@ -26,7 +26,7 @@ class DataFrameView(QTableView):
 
     A click on a column header sorts the rows by that column (``sortable``).
     A right-click opens a menu: column color, no column color, default column
-    color, text color, hide this column, choose columns, reset colors, font. Header
+    color, text color, alignment, hide this column, choose columns, reset colors, font. Header
     texts and formatted values may be HTML (``<sup>``,
     ``<sub>``, ``&tau;``, ``<br>``), e.g. ``pretty_sci_text(v)`` as a format;
     plain header texts use ``\\n`` for line breaks. What the
@@ -63,6 +63,7 @@ class DataFrameView(QTableView):
         self._visible: Optional[List[str]] = None
         self._header_padding = int(header_padding)
         self._pending: Dict[str, Dict[str, Optional[str]]] = {"background": {}, "text": {}}
+        self._pending_alignments: Dict[str, str] = {}
         self._font_key: Optional[str] = None
         self._table_font: Optional[QFont] = None
         header = RichHeaderView(self)
@@ -84,6 +85,7 @@ class DataFrameView(QTableView):
         if self._model is not None:
             for kind in self._pending:
                 self._pending[kind].update(self._model.column_overrides(kind=kind))
+            self._pending_alignments.update(self._model.alignment_overrides())
         self._model = DataFrameModel(df, **model_kwargs, parent=self)
         self.setModel(self._model)
         columns = self._model.columns()
@@ -91,6 +93,9 @@ class DataFrameView(QTableView):
             for col, color in overrides.items():
                 if col in columns:
                     self._model.set_column_color(col, color, kind=kind)
+        for col, alignment in self._pending_alignments.items():
+            if col in columns:
+                self._model.set_column_alignment(col, alignment)
         self._apply_visibility()
         header = self.horizontalHeader()
         if self.isSortingEnabled() and 0 <= header.sortIndicatorSection() < self._model.columnCount():
@@ -164,6 +169,21 @@ class DataFrameView(QTableView):
         if self._model is not None:
             self._model.reset_colors()
 
+    # ----- alignment -----
+    def set_column_alignment(self, column: str, alignment: Optional[str]) -> None:
+        """Override the alignment of ``column`` (``"left"``, ``"center"``, ``"right"``; ``None`` = default); silent."""
+        if self._model is None:
+            if alignment is None:
+                self._pending_alignments.pop(column, None)
+            else:
+                self._pending_alignments[column] = alignment
+            return
+        self._model.set_column_alignment(column, alignment)
+
+    def column_alignment(self, column: str) -> Optional[str]:
+        """Return the effective alignment of ``column``, or ``None`` before ``set_frame``."""
+        return self._model.column_alignment(column) if self._model is not None else None
+
     def _overrides(self, kind: str) -> Dict[str, Optional[str]]:
         return self._model.column_overrides(kind=kind) if self._model is not None else dict(self._pending[kind])
 
@@ -180,6 +200,16 @@ class DataFrameView(QTableView):
             self.setFont(font)
         self.horizontalHeader().setFont(self.font())
         self.verticalHeader().setFont(self.font())
+        # With an application style sheet, Qt paints header sections in the style's font; a rule wins.
+        if font is None:
+            self.verticalHeader().setStyleSheet("")
+        else:
+            style = "italic" if font.italic() else "normal"
+            weight = "bold" if font.bold() else "normal"
+            self.verticalHeader().setStyleSheet(
+                f'QHeaderView::section {{ font-family: "{font.family()}"; font-size: {font.pointSize()}pt;'
+                f" font-style: {style}; font-weight: {weight}; }}"
+            )
         self._fit_rows()
         if self._model is not None:
             self.resizeColumnsToContents()
@@ -192,9 +222,11 @@ class DataFrameView(QTableView):
     # ----- config -----
     def get_config(self) -> Dict[str, Any]:
         """Return what the user may have changed: user colors, visible columns and font."""
+        alignments = self._model.alignment_overrides() if self._model is not None else dict(self._pending_alignments)
         return {
             "backgrounds": self._overrides("background"),
             "text_colors": self._overrides("text"),
+            "alignments": alignments,
             "visible_columns": None if self._visible is None else list(self._visible),
             "font": self._font_key,
         }
@@ -217,6 +249,14 @@ class DataFrameView(QTableView):
                         self.set_column_color(col, color, kind=kind)
                     except KeyError:
                         pass
+        if "alignments" in config:
+            for col in list(self._pending_alignments) + (self._model.columns() if self._model is not None else []):
+                self.set_column_alignment(col, None)
+            for col, alignment in (config["alignments"] or {}).items():
+                try:
+                    self.set_column_alignment(col, alignment)
+                except (KeyError, ValueError):
+                    pass
         if "visible_columns" in config:
             self.set_visible_columns(config["visible_columns"])
 
@@ -269,6 +309,18 @@ class DataFrameView(QTableView):
         menu.addAction("Text Color…", lambda: self._pick_color(column, kind="text"))
         default_text = menu.addAction("Default Text Color", lambda: self._user_restore_color(column, kind="text"))
         default_text.setEnabled(column in self._model.column_overrides(kind="text"))
+        menu.addSeparator()
+        align = QMenu("Alignment", menu)
+        menu.addMenu(align)
+        current = self._model.column_alignment(column)
+        overridden = column in self._model.alignment_overrides()
+        for name, text in (("left", "Left"), ("center", "Center"), ("right", "Right")):
+            action = align.addAction(text, lambda n=name: self._user_set_alignment(column, n))
+            action.setCheckable(True)
+            action.setChecked(name == current)
+        align.addSeparator()
+        default_align = align.addAction("Default", lambda: self._user_set_alignment(column, None))
+        default_align.setEnabled(overridden)
         menu.addSeparator()
         menu.addAction("Hide This Column", lambda: self._hide_column(column))
         menu.addAction("Choose Columns…", self.choose_columns)
@@ -325,6 +377,10 @@ class DataFrameView(QTableView):
 
     def _user_set_color(self, column: str, color: Optional[QColor], *, kind: str = "background") -> None:
         self.set_column_color(column, color, kind=kind)
+        self.configChanged.emit(self.get_config())
+
+    def _user_set_alignment(self, column: str, alignment: Optional[str]) -> None:
+        self.set_column_alignment(column, alignment)
         self.configChanged.emit(self.get_config())
 
     def _user_restore_color(self, column: str, *, kind: str = "background") -> None:
