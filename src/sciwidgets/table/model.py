@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
@@ -20,6 +20,13 @@ _ALIGN = {
     "right": int(Qt.AlignRight | Qt.AlignVCenter),
 }
 
+
+# item roles as plain ints: data() is called for every cell and role when columns are sized, and
+# comparing an int with a Qt enum member is slow
+_DISPLAY = Qt.DisplayRole.value
+_ALIGNMENT = Qt.TextAlignmentRole.value
+_BACKGROUND = Qt.BackgroundRole.value
+_FOREGROUND = Qt.ForegroundRole.value
 
 class DataFrameModel(QAbstractTableModel):
     """Show a DataFrame in a ``QTableView``.
@@ -72,6 +79,8 @@ class DataFrameModel(QAbstractTableModel):
         self._brush_cache: Dict[str, Dict[str, Optional[QBrush]]] = {"background": {}, "text": {}}
         self._overrides: Dict[str, Dict[str, Optional[str]]] = {"background": {}, "text": {}}
         self._df = pd.DataFrame()
+        self._values: Any = None  # the frame as a 2-D object array: fast cell access for data()
+        self._display: Dict[Tuple[int, int], str] = {}  # formatted cells already shown
         self._columns: List[str] = []
         self._alignment: List[int] = []
         self.set_frame(df)
@@ -81,6 +90,7 @@ class DataFrameModel(QAbstractTableModel):
         """Replace the data; formats, backgrounds and headers are kept."""
         self.beginResetModel()
         self._df = df
+        self._refresh_values()
         self._columns = [str(c) for c in df.columns]
         self._alignment = [self._column_alignment(col, df[c]) for col, c in zip(self._columns, df.columns)]
         self._row_brushes = {}
@@ -112,6 +122,7 @@ class DataFrameModel(QAbstractTableModel):
                 key = lambda s: pd.to_numeric(s, errors="coerce")  # noqa: E731 - text that is all numbers
         self.beginResetModel()
         self._df = self._df.sort_values(by=name, ascending=order == Qt.AscendingOrder, kind="stable", key=key)
+        self._refresh_values()
         self._row_brushes = {}
         self.endResetModel()
 
@@ -205,20 +216,26 @@ class DataFrameModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if not index.isValid():
             return None
-        col = self._columns[index.column()]
-        if role == Qt.DisplayRole:
-            value = self._df.iat[index.row(), index.column()]
-            fmt = self._formats.get(col)
-            return fmt(value) if fmt else str(value)
-        if role == Qt.TextAlignmentRole:
+        if role == _DISPLAY:
+            key = (index.row(), index.column())
+            text = self._display.get(key)
+            if text is None:
+                value = self._values[key]
+                fmt = self._formats.get(self._columns[key[1]])
+                text = self._display[key] = fmt(value) if fmt else str(value)
+            return text
+        if role == _ALIGNMENT:
             return self._alignment[index.column()]
-        if role == Qt.BackgroundRole:
+        if role != _BACKGROUND and role != _FOREGROUND:
+            return None
+        col = self._columns[index.column()]
+        if role == _BACKGROUND:
             if self._row_backgrounds is not None and col not in self._overrides["background"]:
                 row_brush = self._row_brush(index.row())
                 if row_brush is not None:
                     return row_brush
             return self._brush("background", col)
-        if role == Qt.ForegroundRole:
+        if role == _FOREGROUND:
             return self._brush("text", col)
         return None
 
@@ -231,6 +248,10 @@ class DataFrameModel(QAbstractTableModel):
         return str(section + 1)
 
     # ----- helpers -----
+    def _refresh_values(self) -> None:
+        self._values = self._df.to_numpy(dtype=object)
+        self._display = {}
+
     def _column_alignment(self, col: str, series: pd.Series) -> int:
         wanted = self._alignment_overrides.get(col)
         if wanted is None:
