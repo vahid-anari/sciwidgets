@@ -33,7 +33,7 @@ DESCRIPTION = json.loads(r"""
   },
   "markers": {
     "window": {"kind": "vspan", "panels": ["flux", "profiles"], "at": [30, 50],
-               "props": {"color": "b", "alpha": 0.1}},
+               "name": "Time window", "center": "center", "props": {"color": "b", "alpha": 0.1}},
     "center": {"kind": "vline", "panels": ["flux", "profiles"], "at": 40,
                "props": {"color": "r", "linewidth": 0.75, "alpha": 0.6}}
   },

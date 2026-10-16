@@ -59,11 +59,16 @@ Description keys:
     Lines and bands drawn across panels, e.g. to highlight a time window:
     ``{id: {"kind": "vline" | "hline" | "vspan" | "hspan", "panels": "all" or
     [panel ids], "at": x (or y) for a line, [lo, hi] for a span,
-    "visible": bool, "props": {...}}}``. Move them with ``set_marker``.
+    "visible": bool, "name": text for menus, "props": {...}}}``. Move them
+    with ``set_marker``. A span may name a line marker drawn at its centre,
+    ``"center": line id``; the line then belongs to the span. The user can
+    change the style of spans (fill, edge and centre line) from the
+    right-click menu; see ``set_span_style``.
 
 User changes
     Right-clicking a panel opens a menu to change curve styles (colour,
-    line, marker), show or hide curves, grids and the legend. ``get_config``
+    line, marker), span styles (fill and edge), show or hide curves, grids
+    and the legend. ``get_config``
     returns only what differs from the description, ``set_config`` restores
     it, and ``configChanged`` reports changes the user made.
 """
@@ -86,7 +91,7 @@ from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import QDialog, QMenu, QWidget
 
 from ._icons import color_icon
-from ._style_dialog import CurveStyleDialog, GridStyleDialog
+from ._style_dialog import CurveStyleDialog, GridStyleDialog, SpanStyleDialog
 
 __all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text"]
 
@@ -126,8 +131,46 @@ _STYLE_KEYS = ("color", "linestyle", "linewidth", "marker", "markersize")
 _GRID_STYLE_KEYS = ("linestyle", "linewidth", "alpha")
 _GRID_KEYS = {("y", "major"): "y_major", ("y", "minor"): "y_minor",
               ("x", "major"): "x_major", ("x", "minor"): "x_minor"}
-_MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "props"})
+_MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "name", "center", "props"})
 _MARKER_KINDS = ("vline", "hline", "vspan", "hspan")
+_SPAN_KINDS = ("vspan", "hspan")
+_SPAN_STYLE_KEYS = ("facecolor", "alpha", "edgecolor", "edge_alpha", "linewidth", "linestyle")
+_CENTER_STYLE_KEYS = ("center_color", "center_alpha", "center_linewidth", "center_linestyle")
+_LINESTYLE_NAMES = {"solid": "-", "dashed": "--", "dotted": ":", "dashdot": "-.",
+                    "none": "None", " ": "None", "": "None"}
+
+
+def _short_linestyle(style: Any) -> str:
+    """Return a line style as ``"-"``, ``"--"``, ``":"``, ``"-."`` or ``"None"``."""
+    if not isinstance(style, str):  # a dash tuple: show it as dashed
+        return "--"
+    return _LINESTYLE_NAMES.get(style.lower(), style)
+
+
+def _span_style_of(patch: Any) -> Dict[str, Any]:
+    """Read fill and edge style of a span patch (opacities from the RGBA colours)."""
+    face = mcolors.to_rgba(patch.get_facecolor())
+    edge = mcolors.to_rgba(patch.get_edgecolor())
+    return {
+        "facecolor": mcolors.to_hex(face),
+        "alpha": round(float(face[3]), 4),
+        "edgecolor": mcolors.to_hex(edge),
+        "edge_alpha": round(float(edge[3]), 4),
+        "linewidth": float(patch.get_linewidth()),
+        "linestyle": _short_linestyle(patch.get_linestyle()),
+    }
+
+
+def _line_style_of(line: Any) -> Dict[str, Any]:
+    """Read the style of a line marker as ``center_*`` keys of a span style."""
+    rgba = mcolors.to_rgba(line.get_color())
+    alpha = line.get_alpha()
+    return {
+        "center_color": mcolors.to_hex(rgba),
+        "center_alpha": round(float(rgba[3] * (1.0 if alpha is None else alpha)), 4),
+        "center_linewidth": float(line.get_linewidth()),
+        "center_linestyle": _short_linestyle(line.get_linestyle()),
+    }
 
 
 def axis_text(label: str, unit: str = "") -> str:
@@ -185,6 +228,10 @@ class _Marker:
     kind: str
     artists: List[Any]
     at: Any = None
+    name: str = ""
+    default_style: Dict[str, Any] = field(default_factory=dict)  # spans and lines
+    center: Optional[str] = None  # spans: id of the line marker at the centre
+    center_of: Optional[str] = None  # lines: id of the span the line belongs to
 
 
 @dataclass
@@ -219,10 +266,13 @@ class PlotCanvas(FigureCanvasQTAgg):
             sends ``get_config()``.
         curveStyleChanged (str): A curve's style changed, by the user or by
             code; sends the curve id (used to keep colour swatches current).
+        spanStyleChanged (str): A span's style changed, by the user or by
+            code; sends the marker id.
     """
 
     configChanged = Signal(object)
     curveStyleChanged = Signal(str)
+    spanStyleChanged = Signal(str)
 
     def __init__(
             self,
@@ -280,7 +330,10 @@ class PlotCanvas(FigureCanvasQTAgg):
             _check_keys(marker_spec, _MARKER_KEYS, f"marker {marker_id!r}")
             self.add_marker(marker_id, marker_spec.get("kind", "vline"), marker_spec.get("panels", "all"),
                             marker_spec.get("at"), visible=marker_spec.get("visible", True),
-                            **marker_spec.get("props", {}))
+                            name=marker_spec.get("name"), **marker_spec.get("props", {}))
+        for marker_id, marker_spec in description.get("markers", {}).items():
+            if marker_spec.get("center") is not None:
+                self.set_span_center(marker_id, marker_spec["center"])
 
         # What the description gives; get_config reports differences from it
         self._default_styles = {cid: self._style_of(cid) for cid in self._curves}
@@ -722,7 +775,7 @@ class PlotCanvas(FigureCanvasQTAgg):
 
     # ----- markers -----
     def add_marker(self, marker_id: str, kind: str, panels: Any = "all", at: Any = None,
-                   *, visible: bool = True, **props: Any) -> None:
+                   *, visible: bool = True, name: Optional[str] = None, **props: Any) -> None:
         """Draw a line or band on panels.
 
         Args:
@@ -733,6 +786,7 @@ class PlotCanvas(FigureCanvasQTAgg):
                 panel or twin ids.
             at: Position; defaults to 0 for lines and (0, 1) for bands.
             visible: Whether it is shown at first.
+            name: Plain text for menus (default: the id).
             **props: Matplotlib properties (``color``, ``alpha``, ...).
 
         Raises:
@@ -756,7 +810,10 @@ class PlotCanvas(FigureCanvasQTAgg):
                 artists.append(ax.axvspan(at[0], at[1], **props))
             else:
                 artists.append(ax.axhspan(at[0], at[1], **props))
-        marker = _Marker(kind=kind, artists=artists, at=at)
+        marker = _Marker(kind=kind, artists=artists, at=at, name=name or marker_id)
+        if artists:
+            marker.default_style = (_span_style_of(artists[0]) if kind in _SPAN_KINDS
+                                    else _line_style_of(artists[0]))
         self._markers[marker_id] = marker
         self.set_marker_visible(marker_id, visible)
 
@@ -804,14 +861,119 @@ class PlotCanvas(FigureCanvasQTAgg):
         return bool(artists) and artists[0].get_visible()
 
     def remove_marker(self, marker_id: str) -> None:
-        """Delete a marker."""
-        for artist in self._marker(marker_id).artists:
+        """Delete a marker (and its link to a span or centre line)."""
+        marker = self._marker(marker_id)
+        for artist in marker.artists:
             artist.remove()
+        if marker.center is not None and marker.center in self._markers:
+            self._markers[marker.center].center_of = None
+        if marker.center_of is not None and marker.center_of in self._markers:
+            self._markers[marker.center_of].center = None
         del self._markers[marker_id]
 
     def marker_ids(self) -> List[str]:
         """Return the ids of all markers."""
         return list(self._markers)
+
+    def span_ids(self) -> List[str]:
+        """Return the ids of the span markers (``vspan``, ``hspan``)."""
+        return [mid for mid, m in self._markers.items() if m.kind in _SPAN_KINDS]
+
+    def get_marker_name(self, marker_id: str) -> str:
+        """Return a marker's plain-text name (for menus)."""
+        return self._marker(marker_id).name
+
+    def _span(self, marker_id: str) -> _Marker:
+        marker = self._marker(marker_id)
+        if marker.kind not in _SPAN_KINDS:
+            raise ValueError(f"marker {marker_id!r} is a {marker.kind}, not a span")
+        return marker
+
+    def set_span_center(self, span_id: str, line_id: Optional[str]) -> None:
+        """Make a line marker the centre line of a span (``None`` unlinks it).
+
+        The line's style is then part of the span's style (``center_*`` keys).
+        Moving and showing the line stay separate (``set_marker``,
+        ``set_marker_visible``).
+
+        Raises:
+            KeyError: For an unknown marker.
+            ValueError: If ``span_id`` is not a span, ``line_id`` not a line,
+                or the line already belongs to another span.
+        """
+        span = self._span(span_id)
+        if span.center is not None and span.center in self._markers:
+            self._markers[span.center].center_of = None
+        span.center = None
+        if line_id is None:
+            return
+        line = self._marker(line_id)
+        if line.kind in _SPAN_KINDS:
+            raise ValueError(f"marker {line_id!r} is a span, not a line")
+        if line.center_of not in (None, span_id):
+            raise ValueError(f"line {line_id!r} already belongs to span {line.center_of!r}")
+        span.center, line.center_of = line_id, span_id
+
+    def get_span_style(self, marker_id: str) -> Dict[str, Any]:
+        """Return a span's style.
+
+        Keys: ``facecolor`` and ``alpha`` (fill colour and opacity),
+        ``edgecolor`` and ``edge_alpha`` (edge colour and opacity),
+        ``linewidth`` and ``linestyle`` (edge line; ``"None"`` for no edge);
+        with a centre line also ``center_color``, ``center_alpha``,
+        ``center_linewidth`` and ``center_linestyle``.
+        """
+        marker = self._span(marker_id)
+        style = _span_style_of(marker.artists[0]) if marker.artists else {
+            k: marker.default_style[k] for k in _SPAN_STYLE_KEYS}
+        if marker.center is not None:
+            line = self._markers[marker.center]
+            style.update(_line_style_of(line.artists[0]) if line.artists else line.default_style)
+        return style
+
+    def default_span_style(self, marker_id: str) -> Dict[str, Any]:
+        """Return a span's style as given by the description (``get_span_style`` format)."""
+        marker = self._span(marker_id)
+        style = dict(marker.default_style)
+        if marker.center is not None:
+            style.update(self._markers[marker.center].default_style)
+        return style
+
+    def set_span_style(self, marker_id: str, **props: Any) -> None:
+        """Change the style of a span on all its panels.
+
+        Args:
+            marker_id: Id of a ``vspan`` or ``hspan`` marker.
+            **props: Any key of ``get_span_style``; keys not given keep
+                their value. ``center_*`` keys need a centre line.
+
+        Raises:
+            KeyError: For an unknown marker.
+            ValueError: For a marker that is not a span, or an unknown key.
+        """
+        marker = self._span(marker_id)
+        allowed = _SPAN_STYLE_KEYS + (_CENTER_STYLE_KEYS if marker.center is not None else ())
+        unknown = set(props) - set(allowed)
+        if unknown:
+            raise ValueError(f"span style: unknown key(s) {sorted(unknown)}; "
+                             f"allowed: {', '.join(allowed)}")
+        style = {**self.get_span_style(marker_id), **props}
+        if any(k in props for k in _SPAN_STYLE_KEYS):
+            face = mcolors.to_rgba(style["facecolor"], float(style["alpha"]))
+            edge = mcolors.to_rgba(style["edgecolor"], float(style["edge_alpha"]))
+            for artist in marker.artists:
+                artist.set_alpha(None)  # the opacities live in the two colours
+                artist.set_facecolor(face)
+                artist.set_edgecolor(edge)
+                artist.set_linewidth(float(style["linewidth"]))
+                artist.set_linestyle(style["linestyle"])
+        if any(k in props for k in _CENTER_STYLE_KEYS):
+            for artist in self._markers[marker.center].artists:
+                artist.set_color(style["center_color"])
+                artist.set_alpha(float(style["center_alpha"]))
+                artist.set_linewidth(float(style["center_linewidth"]))
+                artist.set_linestyle(style["center_linestyle"])
+        self.spanStyleChanged.emit(marker_id)
 
     def default_grid_style(self) -> Dict[str, Any]:
         """Return the grid line style from the description (horizontal lines of a panel)."""
@@ -845,12 +1007,14 @@ class PlotCanvas(FigureCanvasQTAgg):
         """Return what differs from the description, as plain JSON data.
 
         Contains curve styles, the visibility of curves that are not on a
-        ``select: one`` axis, grids and legend visibility::
+        ``select: one`` axis, grids, legend visibility, the grid style and
+        span styles::
 
             {"curves": {"flux": {"color": "#d62728", "linewidth": 2.0},
                         "fit": {"visible": False}},
              "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}},
-             "grid_style": {"linestyle": ":", "alpha": 0.5}}
+             "grid_style": {"linestyle": ":", "alpha": 0.5},
+             "markers": {"window": {"facecolor": "#2ca02c", "alpha": 0.2}}}
         """
         curves: Dict[str, Dict[str, Any]] = {}
         for cid, curve in self._curves.items():
@@ -874,6 +1038,14 @@ class PlotCanvas(FigureCanvasQTAgg):
             out["axes"] = axes
         if self._grid_style:
             out["grid_style"] = dict(self._grid_style)
+        markers: Dict[str, Dict[str, Any]] = {}
+        for mid in self.span_ids():
+            default = self.default_span_style(mid)
+            diff = {k: v for k, v in self.get_span_style(mid).items() if v != default.get(k)}
+            if diff:
+                markers[mid] = diff
+        if markers:
+            out["markers"] = markers
         return out
 
     def set_config(self, config: Mapping[str, Any]) -> None:
@@ -894,6 +1066,14 @@ class PlotCanvas(FigureCanvasQTAgg):
         grid_style = {k: v for k, v in dict(config.get("grid_style", {})).items() if k in _GRID_STYLE_KEYS}
         if grid_style:
             self.set_grid_style(**grid_style)
+        spans = set(self.span_ids())
+        for mid, diff in dict(config.get("markers", {})).items():
+            if mid not in spans:
+                continue
+            keys = _SPAN_STYLE_KEYS + (_CENTER_STYLE_KEYS if self._markers[mid].center else ())
+            style = {k: v for k, v in dict(diff).items() if k in keys}
+            if style:
+                self.set_span_style(mid, **style)
         reverse = {v: k for k, v in _GRID_KEYS.items()}
         for axis_id, diff in dict(config.get("axes", {})).items():
             if axis_id not in self._axes:
@@ -917,6 +1097,19 @@ class PlotCanvas(FigureCanvasQTAgg):
             self._apply_grid(axis)
         for panel_id in self._legends:
             self.set_legend_visible(panel_id, True)
+        for mid in self.span_ids():
+            self._reset_span(mid)
+
+    def _reset_span(self, marker_id: str) -> None:
+        """Give a span its style from the description, only if it was changed
+        (so an untouched span keeps exactly the description's artists' state)."""
+        current, default = self.get_span_style(marker_id), self.default_span_style(marker_id)
+        changed = {k: v for k, v in default.items() if current.get(k) != v}
+        if changed:  # setting only these keeps the rest exactly as built
+            self.set_span_style(marker_id, **{
+                **({k: default[k] for k in _SPAN_STYLE_KEYS} if set(changed) & set(_SPAN_STYLE_KEYS) else {}),
+                **({k: default[k] for k in _CENTER_STYLE_KEYS} if set(changed) & set(_CENTER_STYLE_KEYS) else {}),
+            })
 
     # ----- right-click menu -----
     def _on_press(self, event: Any) -> None:
@@ -952,6 +1145,23 @@ class PlotCanvas(FigureCanvasQTAgg):
         if dialog.exec() == QDialog.Accepted:
             self.set_grid_style(**dialog.style())
             self._user_changed()
+
+    def _edit_span_style(self, marker_id: str) -> None:
+        """Open the style dialog for a span, with a live preview; Cancel restores the old style."""
+        before = self.get_span_style(marker_id)
+
+        def preview(style: Dict[str, Any]) -> None:
+            self.set_span_style(marker_id, **style)
+            self.redraw()
+
+        dialog = SpanStyleDialog(self._markers[marker_id].name, before,
+                                 self.default_span_style(marker_id), self, preview=preview)
+        if dialog.exec() == QDialog.Accepted:
+            self.set_span_style(marker_id, **dialog.style())
+            self._user_changed()
+        else:
+            self.set_span_style(marker_id, **before)
+            self.redraw()
 
     def _show_menu(self, panel_id: str, group: List[_Axis], under: Optional[_Curve]) -> None:
         """Show the right-click menu of a panel at the mouse."""
@@ -1009,6 +1219,22 @@ class PlotCanvas(FigureCanvasQTAgg):
         grid_menu.addSeparator()
         action("Grid style…", self._edit_grid_style, parent=grid_menu)
 
+        group_axes = [a.ax for a in group]
+        panel_spans = [mid for mid in self.span_ids()
+                       if any(artist.axes in group_axes for artist in self._markers[mid].artists)]
+        if len(panel_spans) == 1:
+            mid = panel_spans[0]
+            act = action(f"{self._markers[mid].name} style…", lambda: self._edit_span_style(mid))
+            act.setIcon(color_icon(self.get_span_style(mid)["facecolor"]))
+            act.setIconVisibleInMenu(True)
+        elif panel_spans:
+            span_menu = menu.addMenu("Span style")
+            for mid in panel_spans:
+                act = action(f"{self._markers[mid].name}…",
+                             lambda _=False, m=mid: self._edit_span_style(m), parent=span_menu)
+                act.setIcon(color_icon(self.get_span_style(mid)["facecolor"]))
+                act.setIconVisibleInMenu(True)
+
         if panel_id in self._legends:
             def toggle_legend(on: bool) -> None:
                 self.set_legend_visible(panel_id, on)
@@ -1027,6 +1253,8 @@ class PlotCanvas(FigureCanvasQTAgg):
                 self._apply_grid(axis)
             if panel_id in self._legends:
                 self.set_legend_visible(panel_id, True)
+            for mid in panel_spans:
+                self._reset_span(mid)
             self._user_changed()
         action("Reset this panel", reset_panel)
         return menu

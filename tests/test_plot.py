@@ -1,3 +1,4 @@
+import matplotlib.colors as mcolors
 import numpy as np
 import pytest
 
@@ -100,3 +101,143 @@ def test_export(tmp_path):
     path = tmp_path / "plot.png"
     c.export(str(path))
     assert path.stat().st_size > 0
+
+
+# ----- span style (0.8.0) -----
+
+def span_canvas():
+    return PlotCanvas({
+        "layout": {"mosaic": [["flux"], ["profile"]], "sharex": True},
+        "panels": {"flux": {"curves": {"flux": {}}}, "profile": {"curves": {"pump": {}}}},
+        "markers": {
+            "window": {"kind": "vspan", "panels": "all", "at": [3, 5], "name": "Window",
+                       "center": "center", "props": {"color": "b", "alpha": 0.1}},
+            "band": {"kind": "hspan", "panels": ["flux"], "at": [0.2, 0.4]},
+            "center": {"kind": "vline", "panels": "all", "at": 4,
+                       "props": {"color": "r", "linewidth": 0.75, "alpha": 0.6}},
+        },
+    })
+
+
+def pixels(canvas):
+    canvas.draw()
+    return bytes(canvas.buffer_rgba())
+
+
+def test_span_style_from_description():
+    c = span_canvas()
+    assert c.span_ids() == ["window", "band"]
+    assert c.get_marker_name("window") == "Window" and c.get_marker_name("band") == "band"
+    style = c.get_span_style("window")
+    assert style == {"facecolor": "#0000ff", "alpha": 0.1, "edgecolor": "#0000ff",
+                     "edge_alpha": 0.1, "linewidth": style["linewidth"], "linestyle": "-",
+                     "center_color": "#ff0000", "center_alpha": 0.6, "center_linewidth": 0.75,
+                     "center_linestyle": "-"}
+    assert c.default_span_style("window") == style
+    assert "center_color" not in c.get_span_style("band")      # no centre line
+
+
+def test_span_style_separate_opacities(spy):
+    c = span_canvas()
+    s = spy(c.spanStyleChanged)
+    c.set_span_style("window", facecolor="#2ca02c", alpha=0.25, edgecolor="k", edge_alpha=0.9,
+                     linewidth=2.0, linestyle="--")
+    assert s.calls == [("window",)]
+    for artist in [c.axes("flux").patches[0], c.axes("profile").patches[0]]:  # every panel
+        assert artist.get_facecolor()[3] == pytest.approx(0.25)
+        assert artist.get_edgecolor()[3] == pytest.approx(0.9)
+    style = c.get_span_style("window")
+    assert (style["alpha"], style["edge_alpha"], style["linestyle"]) == (0.25, 0.9, "--")
+    c.set_span_style("window", alpha=0.5)                       # other keys stay
+    assert c.get_span_style("window")["edge_alpha"] == 0.9
+
+
+def test_span_style_errors():
+    c = span_canvas()
+    with pytest.raises(ValueError, match="not a span"):
+        c.set_span_style("center", alpha=0.5)
+    with pytest.raises(ValueError, match="unknown"):
+        c.set_span_style("window", color="r")
+    with pytest.raises(KeyError):
+        c.get_span_style("nothing")
+    with pytest.raises(ValueError, match="unknown"):
+        c.set_span_style("band", center_color="r")              # band has no centre line
+    with pytest.raises(ValueError, match="already belongs"):
+        c.set_span_center("band", "center")
+    with pytest.raises(ValueError, match="not a line"):
+        c.set_span_center("window", "band")
+
+
+def test_span_center_line():
+    c = span_canvas()
+    c.set_span_style("window", center_color="#00ff00", center_alpha=0.3, center_linewidth=2.0,
+                     center_linestyle=":")
+    for ax in (c.axes("flux"), c.axes("profile")):
+        line = ax.lines[-1]
+        assert mcolors.to_hex(line.get_color()) == "#00ff00" and line.get_alpha() == 0.3
+        assert line.get_linewidth() == 2.0
+    assert c.get_span_style("window")["alpha"] == 0.1           # the area is unchanged
+    assert c.get_config() == {"markers": {"window": {"center_color": "#00ff00", "center_alpha": 0.3,
+                                                     "center_linewidth": 2.0, "center_linestyle": ":"}}}
+    c.remove_marker("center")
+    assert "center_color" not in c.get_span_style("window")
+
+
+def test_span_style_in_config(spy):
+    c = span_canvas()
+    changed = spy(c.configChanged)
+    c.set_span_style("window", facecolor="#2ca02c", alpha=0.2)
+    cfg = c.get_config()
+    assert cfg == {"markers": {"window": {"facecolor": "#2ca02c", "alpha": 0.2}}}
+    assert len(changed) == 0                                    # setters are silent
+
+    other = span_canvas()
+    other.set_config({"markers": {**cfg["markers"], "gone": {"alpha": 1},
+                                  "center": {"alpha": 1}, "band": {"bad_key": 1}}})
+    assert other.get_config() == cfg                            # unknown ids, lines and keys ignored
+
+
+def test_span_reset_is_pixel_identical():
+    c = span_canvas()
+    c.set_marker_visible("window", True)
+    before = pixels(c)
+    c.set_span_style("window", facecolor="r", alpha=0.6, edge_alpha=1.0, linewidth=3,
+                     center_color="k", center_linewidth=3)
+    assert pixels(c) != before
+    c.reset_config()
+    assert c.get_config() == {}
+    assert pixels(c) == before
+    c.set_span_style("window", **c.default_span_style("window"))   # explicit default looks the same
+    assert pixels(c) == before
+
+
+def test_span_menu_entries():
+    c = span_canvas()
+    group = [a for a in c._axes.values() if a.panel_id == "flux"]
+    texts = [a.text() for a in c._build_menu("flux", group, None).actions()]
+    assert "Span style" in texts                                # two spans on this panel: a submenu
+    group = [a for a in c._axes.values() if a.panel_id == "profile"]
+    texts = [a.text() for a in c._build_menu("profile", group, None).actions()]
+    assert texts.count("Window style…") == 1                    # one span: one entry, by name
+
+
+def test_span_dialog_preview_and_cancel():
+    from sciwidgets.plot._style_dialog import SpanStyleDialog
+
+    seen = []
+    c = span_canvas()
+    dialog = SpanStyleDialog("Window", c.get_span_style("window"), c.default_span_style("window"),
+                             preview=seen.append)
+    assert seen == []                                           # filling the editors is no change
+    dialog._edge_alpha.setValue(0.8)
+    assert seen[-1]["edge_alpha"] == 0.8 and seen[-1]["alpha"] == 0.1
+    dialog._line.setCurrentIndex(list(dialog._line.itemData(i) for i in range(dialog._line.count()))
+                                 .index("None"))
+    assert dialog.style()["linestyle"] == "None"
+    dialog._c_width.setValue(1.5)
+    assert seen[-1]["center_linewidth"] == 1.5
+    c.set_span_style("window", **dialog.style())                # what the canvas does on OK
+    assert c.get_span_style("window")["linestyle"] == "None"
+    assert c.get_span_style("window")["center_linewidth"] == 1.5
+    plain = SpanStyleDialog("Band", c.get_span_style("band"), c.default_span_style("band"))
+    assert "center_color" not in plain.style()                 # no centre-line section

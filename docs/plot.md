@@ -93,7 +93,7 @@ Lines and bands across panels, e.g. to highlight a time window:
 ```json
 "markers": {
   "window": {"kind": "vspan", "panels": ["flux", "profile"], "at": [30, 50],
-             "props": {"color": "b", "alpha": 0.1}},
+             "name": "Time window", "center": "center", "props": {"color": "b", "alpha": 0.1}},
   "center": {"kind": "vline", "panels": "all", "at": 40, "props": {"color": "r"}}
 }
 ```
@@ -101,7 +101,31 @@ Lines and bands across panels, e.g. to highlight a time window:
 Kinds: `vline`, `hline` (a position) and `vspan`, `hspan` (`[lo, hi]`);
 `"panels": "all"` means every panel, not the twins. Move one with
 `set_marker("window", (60, 80))`; also `add_marker`, `set_marker_visible`,
-`remove_marker`.
+`remove_marker`. `name` is the plain text the right-click menu shows
+(default: the id). `center` makes a line marker the span's centre line, so
+its style is edited with the span (moving and showing it stay separate).
+
+### Span style
+
+The user can change a span's look from the right-click menu (see below):
+fill colour and opacity, edge colour and opacity, edge width and edge line
+(`"None"` for no edge), and for a span with a centre line also the line's
+colour, opacity, width and line style. Fill and edge have separate
+opacities, so a light fill can have a clearly visible edge. From code:
+
+```python
+canvas.set_span_style("window", facecolor="#2ca02c", alpha=0.15,
+                      edgecolor="#2ca02c", edge_alpha=0.8, linewidth=1.0, linestyle="--",
+                      center_color="k", center_alpha=0.6, center_linewidth=0.75,
+                      center_linestyle="-")
+canvas.get_span_style("window")      # all keys (the center_* ones with a centre line)
+canvas.default_span_style("window")  # as the description gives it
+canvas.set_span_center("window", "center")  # link a line from code (None unlinks)
+```
+
+Keys not given keep their value. Only `vspan` and `hspan` markers have a
+span style; other lines (`vline`, `hline`) keep the `props` of the description.
+`spanStyleChanged` sends the marker id after every change.
 
 ## Methods
 
@@ -116,6 +140,7 @@ Kinds: `vline`, `hline` (a position) and `vspan`, `hspan` (`[lo, hi]`);
 | `set_grid(panel, visible, which="major", direction="y")` | grid lines |
 | `set_legend_visible(panel, bool)` | legend |
 | `set_grid_style(linestyle=..., linewidth=..., alpha=...)`, `get_grid_style()` | style of all grid lines |
+| `set_span_style(id, **props)`, `get_span_style(id)`, `span_ids()` | fill and edge of a span |
 | `export(path)` | save as PDF, PNG, SVG, ... (from the extension) |
 | `redraw()` | schedule a redraw after changes |
 | `axes(panel)`, `line(id)` | the Matplotlib objects, for anything else |
@@ -142,7 +167,10 @@ keys of `DEFAULT_AXES_STYLE`:
 Right-clicking a panel opens a menu: the style of the curve under the mouse,
 every curve's style (colour, line, width, marker, size) and visibility, grids,
 a grid style for the whole figure (line, width, opacity; the colours stay
-automatic) and the legend, each curve with its colour swatch.
+automatic), the legend, and the style of the spans on the panel ("<name>
+style…", or a "Span style" submenu when there are several). Curves and
+spans show their colour swatch. The span dialog shows each change at once;
+Cancel puts the old style back.
 `context_menu=False` turns the menu off.
 
 `get_config()` returns only what differs from the description, as plain data
@@ -151,7 +179,8 @@ you can store (e.g. in `QSettings` as JSON):
 ```python
 {"curves": {"flux": {"color": "#d62728", "linewidth": 2.0}, "fit": {"visible": False}},
  "axes": {"flux": {"y_major": True}, "spectrum": {"legend": False}},
- "grid_style": {"linestyle": ":", "alpha": 0.5}}
+ "grid_style": {"linestyle": ":", "alpha": 0.5},
+ "markers": {"window": {"facecolor": "#2ca02c", "alpha": 0.2}}}
 ```
 
 `set_config(cfg)` restores it, `reset_config()` returns to the description.

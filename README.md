@@ -34,8 +34,8 @@ and moved into this package so other apps can share them.
   from a JSON-style description, with templates and shared defaults, and read
   or restore all values as one dict.
 - **Plot canvas**: Matplotlib panels, twins, legends and markers from a
-  description; data by curve id; a right-click style menu whose changes save
-  as plain data.
+  description; data by curve id; a right-click style menu for curves, grids
+  and spans whose changes save as plain data.
 - **Dialogs**: information, warning, error, question, rich-text and About
   dialogs.
 - **Splash screen**: your picture with the app name and version drawn on it,
