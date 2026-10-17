@@ -3,6 +3,10 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.11.0 — 2026-10-17
+
+- New `sciwidgets.app`: an app's double-click launcher (macOS app, Windows Start menu, Linux menu entry; refreshed after updates) and its update check from PyPI (`<app> update` in the terminal; in the window a quiet check, Help ▸ Check for Updates…, the update notice with release notes, Update Now with progress and restart). The app describes itself once in an `AppInfo`. Moved here from Maxwell Bloch Studio and linecat, which had the same code. See `docs/app.md`.
+
 ## 0.10.4 — 2026-10-16
 
 - PySide6 6.12.0 is skipped on Python < 3.12: it loses a reference to `None` every time a Python table model returns `None` from `data()`, which crashes the interpreter after enough table redraws.
