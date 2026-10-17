@@ -12,7 +12,7 @@ panel can treat every parameter the same way. Import them from
 | `ParameterToggle` | `bool` | an option that is on or off, optionally with a formula for each state |
 | `NumericLineEdit` | `int` or `float` | the bare validated number field, without name or unit |
 
-<img src="images/params_demo.png" width="630" alt="Parameter widgets demo, with invalid input marked in red">
+<img src="figures/params_demo.png" width="630" alt="Parameter widgets demo, with invalid input marked in red">
 
 Run `python -m sciwidgets.params` to try them.
 

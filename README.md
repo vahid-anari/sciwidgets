@@ -1,19 +1,22 @@
 # sciwidgets
 
 [![tests](https://github.com/vahid-anari/sciwidgets/actions/workflows/tests.yml/badge.svg)](https://github.com/vahid-anari/sciwidgets/actions/workflows/tests.yml)
+[![PyPI](https://img.shields.io/pypi/v/sciwidgets)](https://pypi.org/project/sciwidgets/)
+[![Python](https://img.shields.io/pypi/pyversions/sciwidgets)](https://pypi.org/project/sciwidgets/)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 PySide6 widgets for scientific desktop apps: math labels rendered with
 LaTeX/mathtext, dialogs, and parameter inputs such as sliders, range sliders
 and validated number fields.
 
-<img src="https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.png" width="900" alt="Sliders demo">
+<img src="https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/figures/sliders_demo.png" width="900" alt="Sliders demo">
 
 Right-click menu, Set Value and Edit Configuration:
 
-![Slider interaction](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/images/sliders_demo.gif)
+![Slider interaction](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/figures/sliders_demo.gif)
 
-The widgets were written for the
-[Maxwell Bloch Solver](https://github.com/vahid-anari/maxwell-bloch-solver)
+The widgets were written for
+[Maxwell Bloch Studio](https://github.com/vahid-anari/maxwell-bloch-studio)
 and moved into this package so other apps can share them.
 
 ## Features
@@ -56,7 +59,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController`, `center_on_screen` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
 | `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
-## Install
+## Installation
 
 ```bash
 pip install sciwidgets
@@ -65,15 +68,6 @@ pip install sciwidgets
 Requires Python 3.10+, PySide6 6.5+, Matplotlib and NumPy (installed
 automatically). A LaTeX installation is optional. The table widgets need
 pandas: `pip install "sciwidgets[table]"`.
-
-For development, from the repo root:
-
-```bash
-pip install -e ".[dev]"
-pytest
-```
-
-The tests run without a window (Qt's offscreen platform) and take about a second.
 
 ## Quick start
 
@@ -150,16 +144,39 @@ python -m sciwidgets.splash
 
 ## Versions
 
-Releases are Git tags following [semantic versioning](https://semver.org).
-Pin an exact tag in your app's requirements, as in the install line above,
-and move to a newer tag when you are ready to test it.
+Versions follow [semantic versioning](https://semver.org); what changed in each
+is in [`CHANGELOG.md`](CHANGELOG.md). Pin a compatible range in your app's
+requirements (for example `sciwidgets~=0.10.4`) and move to a newer version
+when you are ready to test it.
+
+## Development
+
+From the repo root:
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The tests run without a window (Qt's offscreen platform) and take a few
+seconds. Pushing a tag `vX.Y.Z` publishes a GitHub Release with that
+version's section of `CHANGELOG.md`.
+
+## Citing
+
+If you use sciwidgets in published work, please cite it; GitHub's **Cite this
+repository** button gives the reference (from `CITATION.cff`).
 
 ## License
 
-MIT License. See [LICENSE](https://github.com/vahid-anari/sciwidgets/blob/main/LICENSE).
+MIT License. See [LICENSE](LICENSE).
 
 ## Author
 
 Vahid Anari ·
 [GitHub](https://github.com/vahid-anari) ·
 [LinkedIn](https://www.linkedin.com/in/vahid-anari/)
+
+Related projects: [mbsolver](https://github.com/vahid-anari/mbsolver) ·
+[Maxwell Bloch Studio](https://github.com/vahid-anari/maxwell-bloch-studio) ·
+[linecat](https://github.com/vahid-anari/linecat)

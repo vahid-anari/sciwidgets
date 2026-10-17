@@ -5,7 +5,7 @@ on it, and progress messages at the bottom. Import it from `sciwidgets.splash`.
 The name and version are drawn by the widget, so a new version or name never
 needs a new picture.
 
-<img src="images/splash_demo.png" width="560" alt="Splash screen with title, subtitle and a message">
+<img src="figures/splash_demo.png" width="560" alt="Splash screen with title, subtitle and a message">
 
 Run `python -m sciwidgets.splash` to see it.
 

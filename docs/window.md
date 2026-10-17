@@ -5,7 +5,7 @@ description, and a status bar that shows the current state, the document
 path, the elapsed time of long tasks and the memory use. Import them from
 `sciwidgets.window`.
 
-<img src="images/window_demo.png" width="641" alt="Window helpers demo: menu bar with a submenu, and the status bar">
+<img src="figures/window_demo.png" width="641" alt="Window helpers demo: menu bar with a submenu, and the status bar">
 
 Run `python -m sciwidgets.window` to try both.
 

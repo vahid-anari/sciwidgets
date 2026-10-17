@@ -4,7 +4,7 @@ A Matplotlib canvas for Qt windows, built from a plain description of panels
 and curves — for example a section of a JSON settings file. The app then only
 feeds data by curve id. Import from `sciwidgets.plot`.
 
-<img src="images/plot_demo.png" width="900" alt="Plot demo">
+<img src="figures/plot_demo.png" width="900" alt="Plot demo">
 
 Run `python -m sciwidgets.plot` to try it: right-click any panel for the style
 menu, left-click the top panel to move the highlighted window.

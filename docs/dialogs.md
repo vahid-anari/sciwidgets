@@ -4,7 +4,7 @@ Ready-made dialogs for messages, questions and longer information, with a
 consistent look. Import them from `sciwidgets.dialogs`. Each function opens a
 modal dialog and returns when the user closes it.
 
-<img src="images/dialogs_demo.png" width="900" alt="Question, About and rich-information dialogs">
+<img src="figures/dialogs_demo.png" width="900" alt="Question, About and rich-information dialogs">
 
 Run `python -m sciwidgets.dialogs` to see every dialog.
 

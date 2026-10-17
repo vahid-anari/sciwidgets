@@ -4,7 +4,7 @@ Build a whole panel of parameter widgets — groups, columns, tabs — from a
 plain description, for example a section of a JSON settings file, and read or
 restore all of its values as one dict. Import from `sciwidgets.panel`.
 
-<img src="images/panel_demo.png" width="932" alt="Panel demo">
+<img src="figures/panel_demo.png" width="932" alt="Panel demo">
 
 Run `python -m sciwidgets.panel` to try it.
 
