@@ -11,6 +11,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 from collections.abc import Callable
 from importlib import metadata
@@ -19,6 +20,11 @@ from pathlib import Path
 from sciwidgets.app import AppInfo
 
 TIMEOUT_S = 10
+RETRY_TRIES = 5
+RETRY_WAIT_S = 30
+"""Right after a release PyPI's download index (behind a CDN) can lag the version shown on
+its JSON page for a few minutes: pip then finds nothing new. An update that left the old
+version is run again after RETRY_WAIT_S seconds, RETRY_TRIES times in all."""
 MAX_NOTES = 10
 """At most this many versions' notes are shown."""
 
@@ -121,6 +127,12 @@ def installed_version(info: AppInfo) -> str:
     return done.stdout.strip() if done.returncode == 0 else ""
 
 
+def retry_message(latest: str, attempt: int, tries: int, wait_s: int) -> str:
+    """Said before running the update again (``attempt`` is the next one)."""
+    return (f"PyPI is still publishing {latest}: trying again in {wait_s} s "
+            f"(attempt {attempt} of {tries}).")
+
+
 def not_updated_message(info: AppInfo, installed: str, latest: str) -> str:
     """Why an update that ran without errors still left the old version."""
     return (f"The update ran, but {info.name} {installed or '(unknown version)'} is still installed: "
@@ -140,11 +152,15 @@ def run_update(
     ask: Callable[[str], str] = input,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     installed: Callable[[], str] | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    tries: int = RETRY_TRIES,
+    wait_s: int = RETRY_WAIT_S,
 ) -> int:
     """The body of an ``<app> update [--check] [--yes]`` command; returns the exit code.
 
     ``args`` needs ``check`` and ``yes``; the other arguments replace the network and pip in tests.
-    An update counts as done only when the new version is really installed afterwards.
+    An update counts as done only when the new version is really installed afterwards; one
+    that left the old version is tried again (``tries`` times, ``wait_s`` apart).
     """
     installed = installed or (lambda: installed_version(info))
     latest_version = latest_version or (lambda: fetch_latest_version(info))
@@ -187,13 +203,17 @@ def run_update(
         if answer not in ("y", "yes"):
             print("Nothing changed.")
             return 0
-    print(f"Running: {shown}")
-    code = run(command).returncode
-    if code != 0:
-        return code
-    now = installed()
-    if not version_known(now) or parse_version(now) < parse_version(latest):
-        print(not_updated_message(info, now, latest), file=sys.stderr)
-        return 1
-    print(f"{info.name} is now at {now}.")
-    return 0
+    for attempt in range(1, tries + 1):
+        if attempt > 1:
+            print(retry_message(latest, attempt, tries, wait_s))
+            sleep(wait_s)
+        print(f"Running: {shown}")
+        code = run(command).returncode
+        if code != 0:
+            return code
+        now = installed()
+        if version_known(now) and parse_version(now) >= parse_version(latest):
+            print(f"{info.name} is now at {now}.")
+            return 0
+    print(not_updated_message(info, now, latest), file=sys.stderr)
+    return 1

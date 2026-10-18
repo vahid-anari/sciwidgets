@@ -170,7 +170,8 @@ def test_newer_release_notes():
 
 
 def do_update(info, check=False, yes=False, latest="9.0.0", notes=(), kind="pip", answer="n", installed=None):
-    calls = []
+    calls, slept = [], []
+    versions = iter(installed) if isinstance(installed, list) else None
 
     def run(command):
         calls.append(command)
@@ -179,7 +180,9 @@ def do_update(info, check=False, yes=False, latest="9.0.0", notes=(), kind="pip"
     code = update.run_update(info, argparse.Namespace(check=check, yes=yes), latest_version=lambda: latest,
                              release_notes=lambda current, newest: list(notes), kind=lambda: kind,
                              ask=lambda prompt: answer, run=run,
-                             installed=lambda: latest if installed is None else installed)
+                             installed=lambda: next(versions) if versions else (latest if installed is None else installed),
+                             sleep=slept.append)
+    do_update.slept = slept
     return code, calls
 
 
@@ -206,10 +209,19 @@ def test_run_update(info, capsys):
 def test_run_update_that_changed_nothing(info, capsys):
     """pip ran without errors but did not see the new version yet (its cache): not a success."""
     code, calls = do_update(info, yes=True, kind="pipx", installed="1.2.0")
-    assert code == 1 and len(calls) == 1
-    err = capsys.readouterr().err
-    assert "Demo App 1.2.0 is still installed" in err and "Try again in a few minutes" in err
+    assert code == 1 and len(calls) == update.RETRY_TRIES  # tried again, RETRY_WAIT_S apart
+    assert do_update.slept == [update.RETRY_WAIT_S] * (update.RETRY_TRIES - 1)
+    captured = capsys.readouterr()
+    assert "PyPI is still publishing 9.0.0: trying again in 30 s (attempt 2 of 5)" in captured.out
+    assert "Demo App 1.2.0 is still installed" in captured.err and "Try again in a few minutes" in captured.err
     assert do_update(info, yes=True, installed="")[0] == 1
+
+
+def test_run_update_succeeds_on_a_later_try(info, capsys):
+    """Right after a release PyPI's index can lag a few minutes; the second run finds it."""
+    code, calls = do_update(info, yes=True, kind="pipx", installed=["1.2.0", "9.0.0"])
+    assert code == 0 and len(calls) == 2 and do_update.slept == [update.RETRY_WAIT_S]
+    assert "Demo App is now at 9.0.0" in capsys.readouterr().out
 
 
 def test_installed_version(info):
@@ -236,10 +248,12 @@ def test_checker_without_network(info):
     assert seen == ["failed", "up to date"]
 
 
-def run_progress(info, code, installed="9.0"):
+def run_progress(info, code, installed="9.0", tries=1, wait_s=0):
+    versions = iter(installed) if isinstance(installed, list) else None
     dialog = update_ui.UpdateProgressDialog([sys.executable, "-c", code], info, "9.0", "Run it by hand.",
                                             success_note="Unsaved work is asked about.",
-                                            installed=lambda: installed)
+                                            installed=lambda: next(versions) if versions else installed,
+                                            tries=tries, wait_s=wait_s)
     dialog.start()
     assert dialog.wait()
     QApplication.processEvents()
@@ -313,3 +327,23 @@ def test_app_updates_flow(info, monkeypatch):
     updates.checker.updateAvailable.emit("9.0.0", [("9.0.0", "- news")])
     assert len(dialogs) == 1 and not dialogs[0].update_btn.isEnabled()  # not installed: no Update Now
     window.deleteLater()
+
+
+def test_progress_tries_again_while_pypi_publishes(info):
+    """The first run finds nothing new (PyPI's index lags); the dialog waits and runs it again."""
+    from PySide6.QtTest import QTest
+    dialog = run_progress(info, "print('already at latest version')", installed=["1.2.0", "9.0"], tries=3, wait_s=0.05)
+    assert not dialog.succeeded and "trying again" in dialog._status.text() and dialog._stop.isVisibleTo(dialog)
+    for _ in range(200):  # the timer, then the second run
+        if dialog.succeeded:
+            break
+        QTest.qWait(50)
+    assert dialog.succeeded and dialog._output.toPlainText().count("$ ") == 2
+    assert not dialog._stop.isVisibleTo(dialog)
+
+    stopped = run_progress(info, "print('already at latest version')", installed="1.2.0", tries=3, wait_s=60)
+    stopped._stop.click()
+    assert not stopped.succeeded and "did not finish" in stopped._status.text()
+    assert stopped._close.isVisibleTo(stopped) and not stopped._retry_timer.isActive()
+    for d in (dialog, stopped):
+        d.deleteLater()

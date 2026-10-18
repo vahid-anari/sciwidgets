@@ -17,7 +17,7 @@ from pathlib import Path
 from collections.abc import Callable, Sequence
 from html import escape
 
-from PySide6.QtCore import QObject, QProcess, Qt, QUrl, Signal
+from PySide6.QtCore import QObject, QProcess, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFontDatabase
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
@@ -35,11 +35,14 @@ from sciwidgets.app import AppInfo
 from sciwidgets.app.launcher import _same_file, current_system, launcher_info, launcher_path
 from sciwidgets.app.update import (
     EDITABLE_HINT,
+    RETRY_TRIES,
+    RETRY_WAIT_S,
     install_kind,
     installed_version,
     newer_release_notes,
     not_updated_message,
     parse_version,
+    retry_message,
     update_command,
     version_known,
 )
@@ -201,12 +204,15 @@ class UpdateProgressDialog(QDialog):
     ``succeeded`` and ``restart_requested`` tell the outcome. After a failure the dialog shows
     ``manual_hint`` (what to do by hand). ``success_note`` is added after "Restart now…?".
     The update counts as done only when ``installed()`` (the version installed afterwards,
-    by default asked from a fresh Python) has reached ``latest``.
+    by default asked from a fresh Python) has reached ``latest``. Otherwise PyPI is probably
+    still publishing it, and the command runs again after ``wait_s`` seconds, ``tries``
+    times in all; Stop gives up sooner.
     """
 
     def __init__(self, command: Sequence[str], info: AppInfo, latest: str, manual_hint: str,
                  parent: QWidget | None = None, *, success_note: str = "",
-                 installed: Callable[[], str] | None = None) -> None:
+                 installed: Callable[[], str] | None = None,
+                 tries: int = RETRY_TRIES, wait_s: float = RETRY_WAIT_S) -> None:
         super().__init__(parent)
         self._info = info
         self._installed = installed or (lambda: installed_version(info))
@@ -218,6 +224,11 @@ class UpdateProgressDialog(QDialog):
         self._success_note = success_note
         self.succeeded = False
         self.restart_requested = False
+        self._tries = max(1, tries)
+        self._wait_s = wait_s
+        self._attempt = 1
+        self._retry_timer = QTimer(self, singleShot=True)
+        self._retry_timer.timeout.connect(self._run_again)
 
         self._status = QLabel(f"Updating {info.name} to {latest}…")
         self._status.setWordWrap(True)
@@ -231,11 +242,14 @@ class UpdateProgressDialog(QDialog):
         self._restart.clicked.connect(self._choose_restart)
         self._close = QPushButton("Close")
         self._close.clicked.connect(self.reject)
-        for button in (self._later, self._restart, self._close):
+        self._stop = QPushButton("Stop")
+        self._stop.clicked.connect(self._stop_retrying)
+        for button in (self._later, self._restart, self._close, self._stop):
             button.hide()
 
         buttons = QHBoxLayout()
         buttons.addStretch(1)
+        buttons.addWidget(self._stop)
         buttons.addWidget(self._close)
         buttons.addWidget(self._later)
         buttons.addWidget(self._restart)
@@ -280,6 +294,8 @@ class UpdateProgressDialog(QDialog):
             now = self._installed()
             if version_known(now) and parse_version(now) >= parse_version(self._latest):
                 self._succeed()
+            elif self._attempt < self._tries:
+                self._wait_and_retry()
             else:
                 self._fail(escape(not_updated_message(self._info, now, self._latest)))
         else:
@@ -289,7 +305,28 @@ class UpdateProgressDialog(QDialog):
         if error == QProcess.FailedToStart:
             self._fail(f"Could not start {self._command[0]}.")
 
+    def _wait_and_retry(self) -> None:
+        self._attempt += 1
+        message = retry_message(self._latest, self._attempt, self._tries, round(self._wait_s))
+        self._status.setText(escape(message))
+        self._output.appendPlainText("\n" + message)
+        self._stop.show()
+        self._retry_timer.start(round(self._wait_s * 1000))
+
+    def _run_again(self) -> None:
+        self._stop.hide()
+        self._status.setText(f"Updating {escape(self._info.name)} to {escape(self._latest)}… "
+                             f"(attempt {self._attempt} of {self._tries})")
+        self._output.appendPlainText("$ " + " ".join(self._command))
+        self.start()
+
+    def _stop_retrying(self) -> None:
+        self._retry_timer.stop()
+        self._stop.hide()
+        self._fail(escape(not_updated_message(self._info, self._installed(), self._latest)))
+
     def _succeed(self) -> None:
+        self._stop.hide()
         self._done = True
         self.succeeded = True
         note = f" {self._success_note}" if self._success_note else ""
@@ -302,6 +339,7 @@ class UpdateProgressDialog(QDialog):
         if self._done:
             return
         self._done = True
+        self._stop.hide()
         self._status.setText(f"<b>The update did not finish.</b> {reason}<br>{self._manual_hint}")
         self._close.show()
         self._close.setDefault(True)

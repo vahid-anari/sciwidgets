@@ -3,6 +3,13 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.11.3 — 2026-10-18
+
+- Update Now right after a release: PyPI's download index can lag the new version for a
+  few minutes, so pip found nothing new and the update stopped with "did not finish".
+  Now the update runs again after 30 s, up to 5 times ("PyPI is still publishing …"),
+  with a Stop button; `<app> update` in a terminal does the same.
+
 ## 0.11.2 — 2026-10-17
 
 - Restart Now on macOS reopens the app's launcher (made by `install-app`), so the app
