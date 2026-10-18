@@ -3,6 +3,13 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.11.1 — 2026-10-17
+
+- Update Now right after a release: pip no longer uses its cached list of PyPI versions
+  (`--no-cache-dir`), so it sees the new version.
+- An update counts as done only when the new version is really installed; otherwise the
+  dialog (and `<app> update`) says so instead of "Updated to …".
+
 ## 0.11.0 — 2026-10-17
 
 - New `sciwidgets.app`: an app's double-click launcher (macOS app, Windows Start menu, Linux menu entry; refreshed after updates) and its update check from PyPI (`<app> update` in the terminal; in the window a quiet check, Help ▸ Check for Updates…, the update notice with release notes, Update Now with progress and restart). The app describes itself once in an `AppInfo`. Moved here from Maxwell Bloch Studio and linecat, which had the same code. See `docs/app.md`.

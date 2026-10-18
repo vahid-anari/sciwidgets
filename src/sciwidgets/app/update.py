@@ -98,12 +98,33 @@ def install_kind(info: AppInfo) -> str:
 
 
 def update_command(info: AppInfo, kind: str) -> list[str] | None:
-    """The command that updates an installation of the given kind, or ``None``."""
+    """The command that updates an installation of the given kind, or ``None``.
+
+    ``--no-cache-dir``: pip keeps PyPI's list of versions for a few minutes, so right after a
+    release it would otherwise not see the new version, and finish without changing anything.
+    """
     if kind == "pipx":
-        return [shutil.which("pipx") or "pipx", "upgrade", info.dist_name]
+        return [shutil.which("pipx") or "pipx", "upgrade", info.dist_name, "--pip-args=--no-cache-dir"]
     if kind == "pip":
-        return [sys.executable, "-m", "pip", "install", "--upgrade", info.dist_name]
+        return [sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", info.dist_name]
     return None
+
+
+def installed_version(info: AppInfo) -> str:
+    """The version now installed for this Python (asked in a fresh process), or ``""``."""
+    code = "import importlib.metadata as m, sys; print(m.version(sys.argv[1]))"
+    try:
+        done = subprocess.run([sys.executable, "-c", code, info.dist_name],
+                              capture_output=True, text=True, timeout=TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
+def not_updated_message(info: AppInfo, installed: str, latest: str) -> str:
+    """Why an update that ran without errors still left the old version."""
+    return (f"The update ran, but {info.name} {installed or '(unknown version)'} is still installed: "
+            f"PyPI may not offer {latest} yet. Try again in a few minutes.")
 
 
 EDITABLE_HINT = "This copy runs from a source folder (pip install -e); update it there with git pull."
@@ -118,11 +139,14 @@ def run_update(
     kind: Callable[[], str] | None = None,
     ask: Callable[[str], str] = input,
     run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    installed: Callable[[], str] | None = None,
 ) -> int:
     """The body of an ``<app> update [--check] [--yes]`` command; returns the exit code.
 
     ``args`` needs ``check`` and ``yes``; the other arguments replace the network and pip in tests.
+    An update counts as done only when the new version is really installed afterwards.
     """
+    installed = installed or (lambda: installed_version(info))
     latest_version = latest_version or (lambda: fetch_latest_version(info))
     release_notes = release_notes or (lambda current, latest: fetch_release_notes(info, current, latest))
     kind = kind or (lambda: install_kind(info))
@@ -164,4 +188,12 @@ def run_update(
             print("Nothing changed.")
             return 0
     print(f"Running: {shown}")
-    return run(command).returncode
+    code = run(command).returncode
+    if code != 0:
+        return code
+    now = installed()
+    if not version_known(now) or parse_version(now) < parse_version(latest):
+        print(not_updated_message(info, now, latest), file=sys.stderr)
+        return 1
+    print(f"{info.name} is now at {now}.")
+    return 0

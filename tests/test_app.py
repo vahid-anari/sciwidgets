@@ -169,7 +169,7 @@ def test_newer_release_notes():
     assert len(update.newer_release_notes(many, "2.0.0", "2.0.29")) == update.MAX_NOTES
 
 
-def do_update(info, check=False, yes=False, latest="9.0.0", notes=(), kind="pip", answer="n"):
+def do_update(info, check=False, yes=False, latest="9.0.0", notes=(), kind="pip", answer="n", installed=None):
     calls = []
 
     def run(command):
@@ -178,7 +178,8 @@ def do_update(info, check=False, yes=False, latest="9.0.0", notes=(), kind="pip"
 
     code = update.run_update(info, argparse.Namespace(check=check, yes=yes), latest_version=lambda: latest,
                              release_notes=lambda current, newest: list(notes), kind=lambda: kind,
-                             ask=lambda prompt: answer, run=run)
+                             ask=lambda prompt: answer, run=run,
+                             installed=lambda: latest if installed is None else installed)
     return code, calls
 
 
@@ -188,9 +189,11 @@ def test_run_update(info, capsys):
     assert do_update(info, check=True, notes=[("9.0.0", "- big news")]) == (0, [])
     assert "- big news" in capsys.readouterr().out
     assert do_update(info, answer="n") == (0, [])
-    assert do_update(info, answer="y") == (0, [[sys.executable, "-m", "pip", "install", "--upgrade", "demo-app"]])
+    assert do_update(info, answer="y") == (
+        0, [[sys.executable, "-m", "pip", "install", "--upgrade", "--no-cache-dir", "demo-app"]])
     code, calls = do_update(info, yes=True, kind="pipx")
-    assert code == 0 and calls[0][1:] == ["upgrade", "demo-app"]
+    assert code == 0 and calls[0][1:] == ["upgrade", "demo-app", "--pip-args=--no-cache-dir"]
+    assert "Demo App is now at 9.0.0" in capsys.readouterr().out
     assert do_update(info, yes=True, kind="editable") == (1, [])
     assert "git pull" in capsys.readouterr().err
     assert do_update(info, yes=True, kind="unknown") == (1, [])
@@ -198,6 +201,21 @@ def test_run_update(info, capsys):
     def offline():
         raise OSError("no network")
     assert update.run_update(info, argparse.Namespace(check=True, yes=False), latest_version=offline) == 1
+
+
+def test_run_update_that_changed_nothing(info, capsys):
+    """pip ran without errors but did not see the new version yet (its cache): not a success."""
+    code, calls = do_update(info, yes=True, kind="pipx", installed="1.2.0")
+    assert code == 1 and len(calls) == 1
+    err = capsys.readouterr().err
+    assert "Demo App 1.2.0 is still installed" in err and "Try again in a few minutes" in err
+    assert do_update(info, yes=True, installed="")[0] == 1
+
+
+def test_installed_version(info):
+    assert update.installed_version(info) == ""                       # demo-app is not installed
+    pytest_info = AppInfo(**{**info.__dict__, "dist_name": "pytest"})
+    assert update.installed_version(pytest_info) == pytest.__version__
 
 
 def test_install_kind_of_an_unknown_package(info):
@@ -218,9 +236,10 @@ def test_checker_without_network(info):
     assert seen == ["failed", "up to date"]
 
 
-def run_progress(info, code):
+def run_progress(info, code, installed="9.0"):
     dialog = update_ui.UpdateProgressDialog([sys.executable, "-c", code], info, "9.0", "Run it by hand.",
-                                            success_note="Unsaved work is asked about.")
+                                            success_note="Unsaved work is asked about.",
+                                            installed=lambda: installed)
     dialog.start()
     assert dialog.wait()
     QApplication.processEvents()
@@ -235,7 +254,10 @@ def test_progress_success_and_failure(info):
     assert ok.restart_requested
     bad = run_progress(info, "import sys; print('No network'); sys.exit(1)")
     assert not bad.succeeded and "Run it by hand." in bad._status.text() and not bad._restart.isVisibleTo(bad)
-    for dialog in (ok, bad):
+    same = run_progress(info, "print('already at latest version 1.2.0')", installed="1.2.0")
+    assert not same.succeeded and not same._restart.isVisibleTo(same)
+    assert "Updated to" not in same._status.text() and "Demo App 1.2.0 is still installed" in same._status.text()
+    for dialog in (ok, bad, same):
         dialog.deleteLater()
 
 

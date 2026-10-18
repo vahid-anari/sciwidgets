@@ -34,7 +34,9 @@ from sciwidgets.app import AppInfo
 from sciwidgets.app.update import (
     EDITABLE_HINT,
     install_kind,
+    installed_version,
     newer_release_notes,
+    not_updated_message,
     parse_version,
     update_command,
     version_known,
@@ -196,11 +198,16 @@ class UpdateProgressDialog(QDialog):
 
     ``succeeded`` and ``restart_requested`` tell the outcome. After a failure the dialog shows
     ``manual_hint`` (what to do by hand). ``success_note`` is added after "Restart now…?".
+    The update counts as done only when ``installed()`` (the version installed afterwards,
+    by default asked from a fresh Python) has reached ``latest``.
     """
 
     def __init__(self, command: Sequence[str], info: AppInfo, latest: str, manual_hint: str,
-                 parent: QWidget | None = None, *, success_note: str = "") -> None:
+                 parent: QWidget | None = None, *, success_note: str = "",
+                 installed: Callable[[], str] | None = None) -> None:
         super().__init__(parent)
+        self._info = info
+        self._installed = installed or (lambda: installed_version(info))
         self.setWindowTitle("Updating")
         self.resize(640, 380)
         self._command = list(command)
@@ -268,7 +275,11 @@ class UpdateProgressDialog(QDialog):
     def _finished(self, exit_code: int, exit_status: QProcess.ExitStatus) -> None:
         self._read_output()
         if exit_status == QProcess.NormalExit and exit_code == 0:
-            self._succeed()
+            now = self._installed()
+            if version_known(now) and parse_version(now) >= parse_version(self._latest):
+                self._succeed()
+            else:
+                self._fail(escape(not_updated_message(self._info, now, self._latest)))
         else:
             self._fail(f"The update stopped with exit code {exit_code}.")
 
