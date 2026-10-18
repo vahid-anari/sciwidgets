@@ -261,6 +261,21 @@ def test_progress_success_and_failure(info):
         dialog.deleteLater()
 
 
+def test_restart_on_mac_opens_the_launcher(info, tmp_path):
+    """Restarted as `python -m`, the app ran as "Python" instead of as itself on macOS."""
+    _, run = recorder()
+    home = tmp_path / "home"
+    assert update_ui.restart_command(info, system="mac", home=home, python="/env/bin/python") == [
+        "/env/bin/python", "-m", "demoapp"]                                # no launcher yet
+    launcher.install_app(info, system="mac", home=home, python="/env/bin/python", path_env="", run=run)
+    assert update_ui.restart_command(info, system="mac", home=home, python="/env/bin/python") == [
+        "/usr/bin/open", "-n", str(home / "Applications" / "Demo App.app")]
+    assert update_ui.restart_command(info, system="mac", home=home, python="/other/bin/python")[1:] == [
+        "-m", "demoapp"]                                                   # launcher of another Python
+    assert update_ui.restart_command(info, system="linux", home=home, python="/env/bin/python")[1:] == [
+        "-m", "demoapp"]
+
+
 def test_restart(info):
     started = []
     assert update_ui.restart_app(info, lambda: True, lambda program, args: started.append([program, *args]))

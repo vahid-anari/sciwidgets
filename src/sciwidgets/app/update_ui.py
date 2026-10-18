@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from collections.abc import Callable, Sequence
 from html import escape
 
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 from sciwidgets.app import AppInfo
+from sciwidgets.app.launcher import _same_file, current_system, launcher_info, launcher_path
 from sciwidgets.app.update import (
     EDITABLE_HINT,
     install_kind,
@@ -309,9 +311,22 @@ class UpdateProgressDialog(QDialog):
         self.accept()
 
 
-def restart_command(info: AppInfo) -> list[str]:
-    """How to start the app again in the same Python (picks up the new version)."""
-    return [sys.executable, "-m", info.module]
+def restart_command(info: AppInfo, *, system: str | None = None, home: Path | None = None,
+                    python: str | None = None) -> list[str]:
+    """How to start the app again in the same Python (picks up the new version).
+
+    On macOS, when ``<app> install-app`` made a launcher for this Python, the launcher is
+    opened: started as ``python -m <module>`` the app would run as "Python" (Dock icon,
+    menu name, a separate app for macOS) instead of as itself.
+    """
+    system = system or current_system()
+    python = python or sys.executable
+    if system == "mac":
+        home = Path(home) if home is not None else Path.home()
+        found = launcher_info(info, system, home)
+        if found and found["python"] and _same_file(found["python"], python):
+            return ["/usr/bin/open", "-n", str(launcher_path(info, system, home))]
+    return [python, "-m", info.module]
 
 
 def restart_app(info: AppInfo, close_window: Callable[[], bool],

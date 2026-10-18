@@ -3,6 +3,11 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.11.2 — 2026-10-17
+
+- Restart Now on macOS reopens the app's launcher (made by `install-app`), so the app
+  comes back as itself instead of as "Python".
+
 ## 0.11.1 — 2026-10-17
 
 - Update Now right after a release: pip no longer uses its cached list of PyPI versions
