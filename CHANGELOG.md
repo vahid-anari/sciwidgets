@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.11.4 — 2026-10-19
+
+- `ParameterToggle`: the checkbox now starts at the left edge of its column (before, it
+  was indented by half the slider names' width), and the formula label follows the
+  checkbox text instead of sitting at the far right; spare width stays empty on the right.
+
 ## 0.11.3 — 2026-10-18
 
 - Update Now right after a release: PyPI's download index can lag the new version for a

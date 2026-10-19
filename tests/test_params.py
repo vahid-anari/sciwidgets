@@ -54,6 +54,20 @@ def test_toggle(spy):
     assert w.get_value() is False and len(s) == 0
 
 
+def test_toggle_layout_starts_left_with_label_after_text(qapp):
+    """Checkbox at the left edge, label right after it, spare width on the right."""
+    w = ParameterToggle(text="Normalize", label_on="a = b", label_off="a = c", checked=False)
+    w.set_name_width(200)                       # a column's name width does not indent it
+    w.resize(800, w.sizeHint().height())
+    w.show()
+    qapp.processEvents()
+    check, label = w._check.geometry(), w._stack.geometry()
+    assert check.left() == 0
+    assert 0 <= label.left() - check.right() <= 20
+    assert label.right() < 400
+    w.close()
+
+
 # ----- sliders -----
 def test_float_slider_value_config_and_silence(spy):
     w = FloatSlider(label="T_1", min_val=0.1, max_val=10.0, init_val=1.0, val_fmt="{:.2f}")

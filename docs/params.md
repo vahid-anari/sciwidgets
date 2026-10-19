@@ -86,7 +86,9 @@ silently: the current text is kept when it is still there, otherwise
 
 ## ParameterToggle
 
-A checkbox with an optional formula on the right that changes with the state:
+A checkbox with an optional formula after its text that changes with the state.
+The checkbox starts at the left edge of its column (a toggle has no name column,
+so it is not indented to line up with the slider names):
 
 ```python
 from sciwidgets.params import ParameterToggle

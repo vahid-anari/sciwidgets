@@ -3,14 +3,19 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QGridLayout, QWidget, QCheckBox, QStackedWidget
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QStackedWidget, QWidget
 
 from ..labels import MathLabel
 from .base import ParameterWidgetBase
 
 
 class ParameterToggle(ParameterWidgetBase[bool]):
-    """Parameter widget with a checkbox and an optional state-dependent label."""
+    """Parameter widget with a checkbox and an optional state-dependent label.
+
+    The checkbox starts at the left edge and the label follows its text; spare width
+    stays empty on the right. The toggle has no name column, so it does not take part
+    in the name-width alignment of a column.
+    """
 
     def __init__(
             self,
@@ -39,7 +44,7 @@ class ParameterToggle(ParameterWidgetBase[bool]):
         self._stack: QStackedWidget | None = None
         if label_on is not None or label_off is not None:
             self._stack = QStackedWidget(self)
-            align = Qt.AlignRight | Qt.AlignVCenter
+            align = Qt.AlignLeft | Qt.AlignVCenter
             for lbl in (label_off, label_on):  # index 0 = off, 1 = on
                 self._stack.addWidget(
                     MathLabel(lbl, alignment=align, fix_size=True) if lbl is not None else QWidget()
@@ -52,21 +57,15 @@ class ParameterToggle(ParameterWidgetBase[bool]):
         self._make_layout()
 
     def _make_layout(self) -> None:
-        """Create the grid: [name spacer | checkbox | stretch | label | value spacer]."""
+        """Create the row: [checkbox | label | stretch], with the style's spacing between them."""
 
-        gl = QGridLayout(self)
-        gl.setSpacing(0)
+        gl = QHBoxLayout(self)
         gl.setContentsMargins(0, 0, 0, 0)
-        gl.addWidget(self._check, 0, 1)
+        gl.addWidget(self._check, 0, Qt.AlignVCenter)
         if self._stack is not None:
-            gl.addWidget(self._stack, 0, 3, Qt.AlignRight | Qt.AlignVCenter)
-        gl.setColumnStretch(2, 1)
+            gl.addWidget(self._stack, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        gl.addStretch(1)
         self._gl = gl
-        self._update_layout()
-
-    def _update_layout(self) -> None:
-        """Indent the checkbox by half the shared name width of sibling widgets."""
-        self._gl.setColumnMinimumWidth(0, self._effective_name_width() // 2)
 
     def _sync_label(self, state: bool) -> None:
         """Show the label for the current state (any change)."""
