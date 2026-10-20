@@ -3,6 +3,16 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.12.0 — 2026-10-19
+
+- `sciwidgets.app.help.AppHelp`: the Help menu every app shares — User Guide (⌘?), the app's
+  documents (`Document`, `DocumentMenu` for a submenu), Check for Updates… (⌘U), About — for a
+  `MenuBarController` (`menu_items()` + `handle(id)`) or a plain `QMenu` (`add_to(menu)`).
+- `sciwidgets.app.about`: the About text lists the libraries the app is built on, read from the
+  installed metadata (the app's requirements and those of sciwidgets and mbsolver, with version
+  and license, and Qt's own version), so it replaces an "About Qt" item.
+- `docs/app.md`: the shortcuts the apps share, and the macOS keys to avoid.
+
 ## 0.11.4 — 2026-10-19
 
 - `ParameterToggle`: the checkbox now starts at the left edge of its column (before, it

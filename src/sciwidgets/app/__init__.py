@@ -7,9 +7,12 @@ Describe the app once in an :class:`AppInfo` and pass it to
 * :mod:`sciwidgets.app.update` — the Qt-free part: latest version and release notes, how the app
   was installed, the update command, ``run_update`` for an ``<app> update`` terminal command;
 * :mod:`sciwidgets.app.update_ui` — the background check, update notice, "Update Now" with
-  progress and restart, and :class:`~sciwidgets.app.update_ui.AppUpdates` for the menu flow.
+  progress and restart, and :class:`~sciwidgets.app.update_ui.AppUpdates` for the menu flow;
+* :mod:`sciwidgets.app.help` — the Help menu every app shares (User Guide, documents, Check
+  for Updates…, About) with :class:`~sciwidgets.app.help.AppHelp`;
+* :mod:`sciwidgets.app.about` — the About text with the libraries the app is built on.
 
-Only ``update_ui`` imports Qt.
+Only ``update_ui`` and ``help`` import Qt.
 """
 
 from __future__ import annotations

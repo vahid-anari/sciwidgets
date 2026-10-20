@@ -1,4 +1,4 @@
-# App launcher and updates
+# App launcher, updates, Help menu and About
 
 Plumbing for a sciwidgets app that is installed from PyPI: a launcher so it starts
 with a double-click, and an update check with "Update Now". Import it from
@@ -76,3 +76,47 @@ in a progress window and then offers a restart (`python -m <module>` in the same
 manual check also reports "up to date" and failures. `success_note` adds a sentence after the
 restart question, e.g. about unsaved work. The pieces — `UpdateChecker`, `UpdateDialog`,
 `UpdateProgressDialog`, `restart_app` — can be used on their own.
+
+## Help menu and About (`sciwidgets.app.help`, `sciwidgets.app.about`)
+
+`AppHelp` gives every app the same Help menu, in the same order and with the same shortcuts:
+
+```
+User Guide                 ⌘?
+<the app's own documents>
+───────────
+Check for Updates…         ⌘U
+───────────
+About <app name>
+```
+
+```python
+from sciwidgets.app.help import AppHelp, Document, DocumentMenu
+
+help_ = AppHelp(window, APP, user_guide=GUIDE_PDF, author="Vahid Anari",
+                documents=[Document("Equations Reference", EQS_PDF, "Ctrl+Alt+E")],
+                about_extra="Catalog data: CDMS …")           # optional credits
+QTimer.singleShot(2000, help_.updates.check)             # the quiet check at start-up
+
+# with a MenuBarController:
+spec["Help"] = help_.menu_items()                        # ids start with "help_"
+controller.actionTriggered.connect(lambda _menu, action_id, _checked: help_.handle(action_id))
+# with a plain QMenu:
+help_.add_to(menu_bar.addMenu("Help"))
+```
+
+Documents are opened in the system viewer; a missing one gives a message (`missing_hint` adds
+e.g. how to build it). `DocumentMenu(title, [Document, …])` makes a submenu.
+
+**About** shows the version, `APP.comment`, the repository, license and author, the optional
+credits, and **Built with**: the Python version and the libraries the app is built on, read from
+the installed package metadata (`about.app_libraries`): the app's own requirements and those of
+sciwidgets and mbsolver, each with its version and license, plus the version of Qt itself
+(LGPL-3.0). Nothing to update by hand when a dependency changes.
+
+### Shortcuts shared by the apps
+
+Ctrl is ⌘ on macOS. ⌘O opens (the app's main Open…), ⌘S saves, ⌘E exports, ⌘Q quits, ⌘,
+opens settings, ⌘? the User Guide, ⌘U checks for updates, ⌘I shows information about what is
+loaded. macOS keeps some keys for itself, so an app never receives them: ⌥⌘D (Dock), ⌘M
+(minimise), ⌘H and ⌥⌘H (hide), ⌘Tab, ⌘Space, ⌃⌘F (full screen), ⌃⌘Q (lock screen).

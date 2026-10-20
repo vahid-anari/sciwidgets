@@ -56,7 +56,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.labels` | `MathLabel`, `set_latex_enabled` | [Labels](https://github.com/vahid-anari/sciwidgets/blob/main/docs/labels.md) |
 | `sciwidgets.dialogs` | `show_information`, `show_warning`, `show_critical`, `show_rich_information`, `show_about_dialog`, `ask_question` | [Dialogs](https://github.com/vahid-anari/sciwidgets/blob/main/docs/dialogs.md) |
 | `sciwidgets.splash` | `SplashScreen`, `splash_message` | [Splash screen](https://github.com/vahid-anari/sciwidgets/blob/main/docs/splash.md) |
-| `sciwidgets.app` | `AppInfo`; `launcher.install_app_command`, `refresh_if_outdated`; `update.run_update`; `update_ui.AppUpdates` | [App launcher and updates](https://github.com/vahid-anari/sciwidgets/blob/main/docs/app.md) |
+| `sciwidgets.app` | `AppInfo`; `launcher.install_app_command`, `refresh_if_outdated`; `update.run_update`; `update_ui.AppUpdates`; `help.AppHelp` (shared Help menu, About with the libraries used) | [App launcher, updates, Help and About](https://github.com/vahid-anari/sciwidgets/blob/main/docs/app.md) |
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController`, `center_on_screen` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
 | `sciwidgets.style`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `value_to_text`, `pretty_sci_text` | [Style and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
