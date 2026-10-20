@@ -64,6 +64,13 @@ def test_about_text(info):
                  "Data: <i>somewhere</i>", '<a href="https://numpy.org">NumPy</a>', "BSD-3-Clause", "Built with"):
         assert part in text
     assert "Built with" not in about.about_html(info, libraries=[])
+    assert "Citing" not in text
+
+
+def test_about_asks_for_a_citation(info, window):
+    ref = 'Someone (2026). <a href="https://doi.org/10.1/x">doi:10.1/x</a>'
+    text = AppHelp(window, info, citation=ref, libraries=[]).about_html()
+    assert "<b>Citing</b>" in text and "If you use Demo App in published work" in text and ref in text
 
 
 def test_menu_items_order_and_shortcuts(window, info, tmp_path):

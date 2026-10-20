@@ -95,7 +95,8 @@ from sciwidgets.app.help import AppHelp, Document, DocumentMenu
 
 help_ = AppHelp(window, APP, user_guide=GUIDE_PDF, author="Vahid Anari",
                 documents=[Document("Equations Reference", EQS_PDF, "Ctrl+Alt+E")],
-                about_extra="Catalog data: CDMS …")           # optional credits
+                about_extra="Catalog data: CDMS …",           # optional credits
+                citation='Anari, V. … <a href="https://doi.org/…">doi:…</a>')
 QTimer.singleShot(2000, help_.updates.check)             # the quiet check at start-up
 
 # with a MenuBarController:
@@ -109,7 +110,8 @@ Documents are opened in the system viewer; a missing one gives a message (`missi
 e.g. how to build it). `DocumentMenu(title, [Document, …])` makes a submenu.
 
 **About** shows the version, `APP.comment`, the repository, license and author, the optional
-credits, and **Built with**: the Python version and the libraries the app is built on, read from
+credits, a **Citing** request with `citation` ("If you use <app> in published work, please cite:
+…"), and **Built with**: the Python version and the libraries the app is built on, read from
 the installed package metadata (`about.app_libraries`): the app's own requirements and those of
 sciwidgets and mbsolver, each with its version and license, plus the version of Qt itself
 (LGPL-3.0). Nothing to update by hand when a dependency changes.

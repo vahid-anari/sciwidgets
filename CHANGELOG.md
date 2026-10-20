@@ -3,6 +3,11 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.12.1 — 2026-10-19
+
+- About can ask to be cited: `AppHelp(..., citation=...)` (and `about_html(..., citation=...)`) adds
+  a "Citing" paragraph — "If you use <app> in published work, please cite: …".
+
 ## 0.12.0 — 2026-10-19
 
 - `sciwidgets.app.help.AppHelp`: the Help menu every app shares — User Guide (⌘?), the app's

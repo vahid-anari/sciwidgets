@@ -136,12 +136,13 @@ def app_libraries(info: AppInfo, *, also: Sequence[str] = (), expand: Sequence[s
 
 
 def about_html(info: AppInfo, *, author: str = "", license: str = "MIT", extra_html: str = "",
-               libraries: Sequence[Library] | None = None) -> str:
+               citation: str = "", libraries: Sequence[Library] | None = None) -> str:
     """HTML for the About dialog.
 
     Version and ``info.comment`` (the one-line description), the repository link,
-    ``license`` and ``author``, ``extra_html`` (credits for data, citations …) and a table of
-    ``libraries`` (default :func:`app_libraries`) with the Python version.
+    ``license`` and ``author``, ``extra_html`` (credits for data …), a **Citing** request with
+    ``citation`` (HTML, e.g. a reference with its DOI link), and a table of ``libraries``
+    (default :func:`app_libraries`) with the Python version.
     """
     libs = app_libraries(info) if libraries is None else libraries
     repo = f"https://github.com/{info.github_repo}"
@@ -153,6 +154,9 @@ def about_html(info: AppInfo, *, author: str = "", license: str = "MIT", extra_h
     parts.append("</p>")
     if extra_html:
         parts.append(f"<p>{extra_html}</p>")
+    if citation:
+        parts.append(f"<p><b>Citing</b><br>If you use {html.escape(info.name)} in published work, "
+                     f"please cite:<br>{citation}</p>")
     if libs:
         rows = "".join(
             "<tr><td>{name}</td><td>&nbsp;&nbsp;{version}</td><td>&nbsp;&nbsp;{license}</td></tr>".format(

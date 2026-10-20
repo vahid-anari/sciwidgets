@@ -71,7 +71,9 @@ class AppHelp(QObject):
             :class:`DocumentMenu` submenus.
         author: Shown in About after the license, e.g. "Vahid Anari".
         license: The app's license, "MIT" by default.
-        about_extra: Extra HTML for About (data credits, citations).
+        about_extra: Extra HTML for About (data credits).
+        citation: HTML reference shown in About under "Citing" ("If you use <app> in published
+            work, please cite: …"), e.g. with a DOI link.
         libraries: The library list for About; ``None`` reads it from the installed metadata.
         missing_hint: Added to the message when a document is missing (e.g. how to build it).
         success_note: Passed to :class:`AppUpdates` (shown after an update ran).
@@ -85,7 +87,7 @@ class AppHelp(QObject):
 
     def __init__(self, window: QWidget, info: AppInfo, *, user_guide: Path | None = None,
                  documents: Sequence[Union[Document, DocumentMenu]] = (), author: str = "", license: str = "MIT",
-                 about_extra: str = "", libraries: Sequence[Library] | None = None, missing_hint: str = "",
+                 about_extra: str = "", citation: str = "", libraries: Sequence[Library] | None = None, missing_hint: str = "",
                  success_note: str = "") -> None:
         super().__init__(window)
         self._window = window
@@ -94,6 +96,7 @@ class AppHelp(QObject):
         if user_guide is not None:
             self._documents.insert(0, Document("User Guide", Path(user_guide), QKeySequence.HelpContents))
         self._author, self._license, self._extra = author, license, about_extra
+        self._citation = citation
         self._libraries = libraries
         self._missing_hint = missing_hint
         self.updates = AppUpdates(window, info, success_note=success_note)
@@ -191,7 +194,7 @@ class AppHelp(QObject):
     def about_html(self) -> str:
         """The About text (see :func:`sciwidgets.app.about.about_html`)."""
         return about_html(self.info, author=self._author, license=self._license, extra_html=self._extra,
-                          libraries=self._libraries)
+                          citation=self._citation, libraries=self._libraries)
 
     def show_about(self) -> None:
         """About <app name>."""
