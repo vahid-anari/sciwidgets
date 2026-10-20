@@ -386,6 +386,10 @@ class AppUpdates(QObject):
     ``check()`` is quiet: only a newer version is shown. ``check(manual=True)`` (a "Check for
     Updates…" menu item) also reports "up to date" and failures.
 
+    Only one check runs at a time: a check asked for while another is running, or while its
+    notice is open, starts nothing (a manual one makes the running check report every outcome),
+    so the quiet start-up check and the menu item never show two notices.
+
     Args:
         window: The main window; the dialogs are its children and a restart closes it.
         info: The app.
@@ -399,18 +403,36 @@ class AppUpdates(QObject):
         self._info = info
         self._success_note = success_note
         self._manual = False
+        self._busy = False  # a check is running, or its notice / progress window is open
         self.checker = UpdateChecker(info, self)
         self.checker.updateAvailable.connect(self._on_update_available)
         self.checker.upToDate.connect(self._on_up_to_date)
         self.checker.checkFailed.connect(self._on_failed)
 
+    @property
+    def busy(self) -> bool:
+        """Whether a check is running or its notice is open."""
+        return self._busy
+
     def check(self, manual: bool = False) -> None:
-        """Ask PyPI for a newer version."""
+        """Ask PyPI for a newer version (nothing new starts while a check is running)."""
+        if self._busy:
+            self._manual = self._manual or manual
+            return
+        self._busy = True
         self._manual = manual
         self.checker.check()
 
     def _on_update_available(self, latest: str, notes: list) -> None:
         self._manual = False
+        self._busy = True
+        try:
+            self._offer_update(latest, notes)
+        finally:
+            self._busy = False
+            self._manual = False  # a menu request made while the notice was open is answered by it
+
+    def _offer_update(self, latest: str, notes: list) -> None:
         kind = install_kind(self._info)
         command = update_command(self._info, kind)
         dialog = UpdateDialog(self._info, latest, " ".join(command) if command else "", notes, parent=self._window,
@@ -428,12 +450,19 @@ class AppUpdates(QObject):
             restart_app(self._info, self._window.close)
 
     def _on_up_to_date(self) -> None:
-        if self._manual:
-            show_information("No Updates", f"{self._info.name} {self._info.version} is the latest version.",
-                             parent=self._window)
-        self._manual = False
+        manual, self._manual = self._manual, False
+        try:
+            if manual:
+                show_information("No Updates", f"{self._info.name} {self._info.version} is the latest version.",
+                                 parent=self._window)
+        finally:
+            self._busy = False
 
     def _on_failed(self, message: str) -> None:
-        if self._manual:
-            show_warning("Update Check Failed", "Could not check for updates.", escape(message), parent=self._window)
-        self._manual = False
+        manual, self._manual = self._manual, False
+        try:
+            if manual:
+                show_warning("Update Check Failed", "Could not check for updates.", escape(message),
+                             parent=self._window)
+        finally:
+            self._busy = False

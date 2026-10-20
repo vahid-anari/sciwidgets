@@ -329,6 +329,41 @@ def test_app_updates_flow(info, monkeypatch):
     window.deleteLater()
 
 
+def test_one_check_at_a_time(info, monkeypatch):
+    """The menu item pressed while the quiet start-up check runs gives one notice, not two."""
+    window = QMainWindow()
+    messages, dialogs, requests = [], [], []
+    monkeypatch.setattr(update_ui, "show_information", lambda title, text, **k: messages.append(text))
+    monkeypatch.setattr(update_ui.UpdateDialog, "exec", lambda self: dialogs.append(self) or 0)
+    updates = update_ui.AppUpdates(window, info)
+    monkeypatch.setattr(updates.checker, "check", lambda: requests.append(1))  # the reply comes later
+    updates.check()                                    # quiet start-up check, still running
+    updates.check(manual=True)                         # Help > Check for Updates… meanwhile
+    assert len(requests) == 1 and updates.busy
+    updates.checker.upToDate.emit()                    # the one reply: reported, since the menu asked
+    assert messages == ["Demo App 1.2.0 is the latest version."] and not updates.busy
+
+    updates.check(manual=True)
+    updates.check()                                    # the start-up timer fires during the manual check
+    assert len(requests) == 2
+    updates.checker.updateAvailable.emit("9.0.0", [])
+    assert len(dialogs) == 1 and not updates.busy
+
+    def reenter(self):                                 # a check asked for while the notice is open
+        updates.check()
+        updates.check(manual=True)
+        dialogs.append(self)
+        return 0
+    monkeypatch.setattr(update_ui.UpdateDialog, "exec", reenter)
+    updates.check(manual=True)
+    updates.checker.updateAvailable.emit("9.0.0", [])
+    assert len(requests) == 3 and len(dialogs) == 2 and not updates.busy
+    monkeypatch.setattr(updates.checker, "check", lambda: updates.checker.upToDate.emit())
+    updates.check()                                    # a later quiet check stays quiet
+    assert len(messages) == 1
+    window.deleteLater()
+
+
 def test_progress_tries_again_while_pypi_publishes(info):
     """The first run finds nothing new (PyPI's index lags); the dialog waits and runs it again."""
     from PySide6.QtTest import QTest
