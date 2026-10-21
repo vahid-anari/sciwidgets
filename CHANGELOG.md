@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.12.3 — 2026-10-21
+
+- Updates: the notes of the newer versions only come from the app's own release tags (`v1.2.0` or
+  `1.2.0`). A repository that also releases something else with tags of its own (Daftarche's
+  `phone-v0.3.0`) no longer has those notes shown as the app's.
+
 ## 0.12.2 — 2026-10-19
 
 - Updates: only one check runs at a time. Choosing Check for Updates… while the quiet start-up

@@ -165,6 +165,8 @@ def test_newer_release_notes():
                 {"tag_name": "v1.2.1", "body": "\n- 2.1\n"}, {"tag_name": "v1.2.0", "body": "- 2"},
                 {"tag_name": "v1.1.0", "body": " "}]
     assert update.newer_release_notes(releases, "1.2.0", "1.3.0") == [("1.3.0", "- 3"), ("1.2.1", "- 2.1")]
+    other = [{"tag_name": "phone-v1.2.5", "body": "- the phone app"}, {"tag_name": "1.2.2", "body": "- bare"}]
+    assert update.newer_release_notes(other, "1.2.0", "1.3.0") == [("1.2.2", "- bare")]  # another app's tags: not ours
     many = [{"tag_name": f"v2.0.{i}", "body": f"- {i}"} for i in range(1, 30)]
     assert len(update.newer_release_notes(many, "2.0.0", "2.0.29")) == update.MAX_NOTES
 

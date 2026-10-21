@@ -40,6 +40,14 @@ def parse_version(text: str) -> tuple[int, ...]:
     return tuple(parts)
 
 
+def is_version_tag(tag: str) -> bool:
+    """``"v1.2.0"`` or ``"1.2.0"``: a release of the app itself (not ``"phone-v0.3.0"``)."""
+    tag = tag.strip()
+    if tag[:1] in ("v", "V"):
+        tag = tag[1:]
+    return tag[:1].isdigit()
+
+
 def version_known(version: str) -> bool:
     """False for an app not installed as a package (``0.0.0``, ``0+unknown``, ``""``)."""
     return any(parse_version(version)) and not version.startswith("0+")
@@ -48,7 +56,8 @@ def version_known(version: str) -> bool:
 def newer_release_notes(releases: list, current: str, latest: str, limit: int = MAX_NOTES) -> list[tuple[str, str]]:
     """``(version, notes)`` of the GitHub releases after ``current`` up to ``latest``, newest first.
 
-    Drafts, pre-releases and releases without notes are left out.
+    Drafts, pre-releases and releases without notes are left out, and so are tags of another
+    kind in the same repository (``phone-v0.3.0``: only ``v1.2.0`` or ``1.2.0`` are the app's).
     """
     cur, top = parse_version(current), parse_version(latest)
     picked: list[tuple[tuple[int, ...], str, str]] = []
@@ -56,6 +65,8 @@ def newer_release_notes(releases: list, current: str, latest: str, limit: int = 
         if not isinstance(rel, dict) or rel.get("draft") or rel.get("prerelease"):
             continue
         tag = str(rel.get("tag_name") or "")
+        if not is_version_tag(tag):
+            continue
         ver = parse_version(tag)
         body = str(rel.get("body") or "").strip()
         if ver and cur < ver <= top and body:
