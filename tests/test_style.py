@@ -149,3 +149,14 @@ def test_menu_separator_is_visible_in_dark_mode(qapp, scheme):
     background = QColor(image.pixel(first.right() - 3, first.top() + 1)).lightness()
     menu.close()
     assert line - background > 20
+
+
+def test_input_edges_are_visible_in_dark_mode(qapp, scheme):
+    from PySide6.QtWidgets import QDoubleSpinBox, QLineEdit
+    scheme("dark")
+    for field in (QLineEdit("1.5"), QDoubleSpinBox()):
+        field.resize(160, 28)
+        image = field.grab().toImage()
+        edge = QColor(image.pixel(field.width() // 2, 0)).lightness()
+        inside = QColor(image.pixel(field.width() // 2, 4)).lightness()
+        assert edge - inside > 20, type(field).__name__

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple, Union
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPalette, QPen
 from PySide6.QtWidgets import (
     QApplication,
@@ -294,7 +294,9 @@ class SciStyle(QProxyStyle):
 
             return super().drawComplexControl(control, option, painter, widget)
 
-        return super().drawComplexControl(control, option, painter, widget)
+        super().drawComplexControl(control, option, painter, widget)
+        if control == QStyle.CC_SpinBox and option.frame:
+            _dark_input_edge(option, painter)
 
     def drawControl(self, element, option, painter, widget=None):
         """Draw a Qt control; menu separators get a visible line in dark mode.
@@ -330,6 +332,9 @@ class SciStyle(QProxyStyle):
 
         super().drawPrimitive(element, option, painter, widget)
 
+        if element == QStyle.PE_FrameLineEdit:
+            _dark_input_edge(option, painter)
+
         if element == QStyle.PE_PanelLineEdit and isinstance(widget, QLineEdit):
             if (option.state & QStyle.State_Enabled) and bool(widget.property("invalid")):
                 painter.save()
@@ -345,14 +350,32 @@ class SciStyle(QProxyStyle):
                 finally:
                     painter.restore()
 
-def _font_rule(selector: str, size: int, family: str, color: Optional[str] = None) -> str:
+def _dark_input_edge(option, painter) -> None:
+    """Draw a visible edge around an input field (line edit, spin box) in dark mode.
+
+    Fusion's edge is a shade darker than the window, which is lost on a dark
+    one. A field with focus keeps Fusion's highlight edge.
+    """
+    if not is_dark(option.palette) or option.state & QStyle.State_HasFocus:
+        return
+    alpha = 70 if option.state & QStyle.State_Enabled else 35
+    painter.save()
+    painter.setRenderHint(painter.RenderHint.Antialiasing, True)
+    painter.setPen(QPen(QColor(255, 255, 255, alpha), 1))
+    painter.setBrush(Qt.NoBrush)
+    painter.drawRoundedRect(QRectF(option.rect).adjusted(0.5, 0.5, -0.5, -0.5), 2, 2)
+    painter.restore()
+
+
+def _font_rule(selector: str, size: int, family: str, color: Optional[str] = None,
+               disabled_alpha: int = 50) -> str:
     """Build a font (and optional color) rule for one selector."""
     rule = f"{selector}{{font-size: {size}pt; font-family: {family};"
     if color is None:
         return rule + "}"
     c = QColor(color)
     disabled = QColor(color)
-    disabled.setAlpha(50)
+    disabled.setAlpha(disabled_alpha)
     return (
         rule + f"color: {c.name()};}}"
         f"{selector}:disabled{{color: {disabled.name(QColor.HexArgb)};}}"
@@ -376,11 +399,12 @@ def sci_style_sheet(app: QApplication) -> str:
     fs, fm = f.pointSize(), f.family()
     dark = is_dark(app.palette())
     value = sci_color("value", dark)
+    faded = 110 if dark else 50  # disabled text: a faint color is lost on a dark background
     return (
-        _font_rule("QLabel#slider_value", fs + 1, fm, value)
-        + _font_rule("QLabel#slider_range", fs - 1, fm, sci_color("range_label", dark))
-        + _font_rule("QLineEdit", fs + 1, fm, value)
-        + _font_rule("QAbstractSpinBox", fs + 1, fm, value)  # QSpinBox, QDoubleSpinBox, date and time edits
+        _font_rule("QLabel#slider_value", fs + 1, fm, value, faded)
+        + _font_rule("QLabel#slider_range", fs - 1, fm, sci_color("range_label", dark), faded)
+        + _font_rule("QLineEdit", fs + 1, fm, value, faded)
+        + _font_rule("QAbstractSpinBox", fs + 1, fm, value, faded)  # QSpinBox, QDoubleSpinBox, date and time edits
     )
 
 

@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.14.2 — 2026-10-23
+
+- Line edits and spin boxes have a visible edge in dark mode (Fusion's edge is a shade darker than
+  the window); a field with focus keeps its highlight edge.
+- Disabled values and field text are easier to read in dark mode.
+
 ## 0.14.1 — 2026-10-22
 
 - Menu separators are visible in dark mode (Fusion drew them a shade darker than the menu).
