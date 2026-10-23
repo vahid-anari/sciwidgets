@@ -28,8 +28,9 @@ Description keys:
     all panels or a list of panel ids that share their x axis.
 ``figure``
     Keyword arguments of ``matplotlib.figure.Figure`` (``figsize``, ``dpi``,
-    ``facecolor``, ...) and ``margins`` (``left``, ``right``, ``bottom``,
-    ``top`` as for ``subplots_adjust``).
+    ``facecolor``, ...), ``margins`` (``left``, ``right``, ``bottom``,
+    ``top`` as for ``subplots_adjust``) and ``dark_facecolor``, the figure
+    background in dark mode.
 ``styles``
     Named line styles (Matplotlib ``Line2D`` properties).
 ``axes_style``
@@ -65,6 +66,16 @@ Description keys:
     change the style of spans (fill, edge and centre line) from the
     right-click menu; see ``set_span_style``.
 
+Light and dark mode
+    The canvas follows the application palette (see ``set_scheme``). In dark
+    mode the frame (backgrounds, text, ticks, legend box) takes the colours of
+    ``axes_style["dark"]``, and every colour too dark for the dark background
+    is drawn lighter, with its hue kept (``dark_variant``). A colour can be
+    given its own dark version instead: ``"dark_color"`` in a curve's style or
+    props and in a line marker's props, ``"dark_facecolor"`` and
+    ``"dark_edgecolor"`` (or ``"dark_color"`` for both) in a span's props. The
+    user can do the same in the style dialogs. Exports are light by default.
+
 User changes
     Right-clicking a panel opens a menu to change curve styles (colour,
     line, marker), span styles (fill and edge), show or hide curves, grids
@@ -86,14 +97,16 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.ticker import AutoMinorLocator, ScalarFormatter
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QEvent, QTimer, Signal
 from PySide6.QtGui import QAction, QCursor
 from PySide6.QtWidgets import QDialog, QMenu, QWidget
 
+from ..style import is_dark
+from ..colors import dark_variant
 from ._icons import color_icon
 from ._style_dialog import CurveStyleDialog, GridStyleDialog, SpanStyleDialog
 
-__all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text"]
+__all__ = ["DEFAULT_AXES_STYLE", "PlotCanvas", "axis_text", "dark_variant"]
 
 DEFAULT_AXES_STYLE: Dict[str, Any] = {
     "zero_line": {"color": "k", "linestyle": "--", "linewidth": 0.75, "alpha": 0.6},
@@ -111,6 +124,8 @@ DEFAULT_AXES_STYLE: Dict[str, Any] = {
     "ticks_x": {},
     "ticks_y": {},
     "label_pad": [None, None],
+    "dark": {"figure": "#2a2a2a", "axes": "#1e1e1e", "text": "#d8d8d8", "edge": "#9a9a9a",
+             "legend_face": "#2a2a2a", "legend_edge": "#606060"},
 }
 """Shared axis styling; a description's ``axes_style`` overrides single keys.
 
@@ -121,21 +136,26 @@ extra tick settings for one axis only (e.g. ``{"pad": 5}``); ``label_pad``
 is the x and y label distance in points (``None`` = Matplotlib's default);
 ``grid`` styles all grid lines, ``grid_value`` additionally the lines along
 the value axis (horizontal for a panel), which take the primary curve's
-colour.
+colour. ``dark`` holds the frame colours of dark mode: ``figure`` and
+``axes`` backgrounds (a description's ``figure.dark_facecolor`` takes
+precedence for the figure), ``text`` (labels, tick numbers, legend text),
+``edge`` (axes edges and ticks), ``legend_face`` and ``legend_edge``.
 """
 
 _PANEL_KEYS = frozenset({"curves", "x", "y", "primary", "select", "zero_line", "legend", "grid", "twin"})
 _TWIN_KEYS = frozenset({"axis", "curves", "x", "y", "primary", "select", "zero_line", "grid"})
 _CURVE_KEYS = frozenset({"label", "unit", "legend", "name", "style", "props"})
-_STYLE_KEYS = ("color", "linestyle", "linewidth", "marker", "markersize")
+_STYLE_KEYS = ("color", "dark_color", "linestyle", "linewidth", "marker", "markersize")
 _GRID_STYLE_KEYS = ("linestyle", "linewidth", "alpha")
 _GRID_KEYS = {("y", "major"): "y_major", ("y", "minor"): "y_minor",
               ("x", "major"): "x_major", ("x", "minor"): "x_minor"}
 _MARKER_KEYS = frozenset({"kind", "panels", "at", "visible", "name", "center", "props"})
 _MARKER_KINDS = ("vline", "hline", "vspan", "hspan")
 _SPAN_KINDS = ("vspan", "hspan")
-_SPAN_STYLE_KEYS = ("facecolor", "alpha", "edgecolor", "edge_alpha", "linewidth", "linestyle")
-_CENTER_STYLE_KEYS = ("center_color", "center_alpha", "center_linewidth", "center_linestyle")
+_SPAN_STYLE_KEYS = ("facecolor", "dark_facecolor", "alpha", "edgecolor", "dark_edgecolor", "edge_alpha",
+                    "linewidth", "linestyle")
+_CENTER_STYLE_KEYS = ("center_color", "dark_center_color", "center_alpha", "center_linewidth", "center_linestyle")
+_SCHEMES = ("auto", "light", "dark")
 _LINESTYLE_NAMES = {"solid": "-", "dashed": "--", "dotted": ":", "dashdot": "-.",
                     "none": "None", " ": "None", "": "None"}
 
@@ -281,6 +301,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             *,
             usetex: bool = False,
             context_menu: bool = True,
+            scheme: str = "auto",
     ) -> None:
         """Build the figure.
 
@@ -289,6 +310,8 @@ class PlotCanvas(FigureCanvasQTAgg):
             parent: Parent widget.
             usetex: Render axis labels with the system LaTeX.
             context_menu: Offer the right-click menu for user changes.
+            scheme: ``"auto"`` follows the application palette (light or
+                dark); ``"light"`` or ``"dark"`` keeps the plot in one of them.
 
         Raises:
             ValueError: For an unknown key, a panel missing from the mosaic,
@@ -305,14 +328,33 @@ class PlotCanvas(FigureCanvasQTAgg):
         self._legend_on: Dict[str, bool] = {}
         self._markers: Dict[str, _Marker] = {}
         self._grid_style: Dict[str, Any] = {}  # user's grid style; overrides the description
+        # Light colour and optional own dark colour of every curve and marker colour:
+        # ("curve", id), ("face", span id), ("edge", span id), ("line", line marker id)
+        self._colors: Dict[Tuple[str, str], List[Optional[str]]] = {}
+        if scheme not in _SCHEMES:
+            raise ValueError(f"scheme must be one of {', '.join(_SCHEMES)}, got {scheme!r}")
+        self._scheme = scheme
+        self._dark = False  # what is shown; the description is built light, then switched
+        self._scheme_check_pending = False
 
         fig_spec = dict(description.get("figure", {}))
         margins = fig_spec.pop("margins", None)
+        dark_face = fig_spec.pop("dark_facecolor", None)
         figure = Figure(**fig_spec)
         super().__init__(figure)
         self.setParent(parent)
         if margins:
             figure.subplots_adjust(**margins)
+        rc = mpl.rcParams
+        self._light_frame = {
+            "figure": mcolors.to_hex(figure.get_facecolor()), "axes": rc["axes.facecolor"],
+            "text": rc["axes.labelcolor"], "tick": rc["xtick.color"],
+            "ticklabel": rc["xtick.color"] if rc["xtick.labelcolor"] == "inherit" else rc["xtick.labelcolor"],
+            "edge": rc["axes.edgecolor"],
+        }
+        self._dark_frame = dict(self._axes_style["dark"])
+        if dark_face is not None:
+            self._dark_frame["figure"] = dark_face
 
         mosaic_axes = self._make_mosaic(figure, description.get("layout", {}))
         panels = description.get("panels", {})
@@ -340,6 +382,8 @@ class PlotCanvas(FigureCanvasQTAgg):
         self._default_visible = {cid: c.line.get_visible() for cid, c in self._curves.items()}
         if context_menu:
             self.mpl_connect("button_press_event", self._on_press)
+        if self._wants_dark():
+            self._apply_scheme(True)
 
     # ----- construction -----
     @staticmethod
@@ -457,7 +501,10 @@ class PlotCanvas(FigureCanvasQTAgg):
             known = ", ".join(sorted(self._styles)) or "none"
             raise ValueError(f"{where}: unknown style {style_name!r}; known styles: {known}")
         props = _merge(self._styles.get(style_name, {}), spec.get("props", {}))
+        dark_color = props.pop("dark_color", None)
         (line,) = axis.ax.plot([], [], **props)
+        self._colors[("curve", curve_id)] = [mcolors.to_hex(line.get_color()),
+                                             None if dark_color is None else mcolors.to_hex(dark_color)]
         label = spec.get("label", "")
         curve = _Curve(
             id=curve_id, axis_id=axis.id, line=line,
@@ -499,11 +546,108 @@ class PlotCanvas(FigureCanvasQTAgg):
         extra = {"labelpad": pad} if pad is not None else {}
         setter(text, usetex=self._usetex, **self._axes_style["label_font"], **extra)
 
+    # ----- light and dark mode -----
+    def _dark_version(self, color: Any) -> str:
+        """The automatic dark-mode version of a colour (for this canvas' dark background)."""
+        return dark_variant(color, self._dark_frame["axes"])
+
+    def _shown(self, key: Tuple[str, str]) -> str:
+        """The colour drawn now for a curve or marker colour (light, own dark or automatic dark)."""
+        light, dark = self._colors[key]
+        if not self._dark:
+            return light
+        return dark if dark is not None else self._dark_version(light)
+
+    def _wants_dark(self) -> bool:
+        """Whether the plot should be dark now, from the scheme and the palette."""
+        if self._scheme == "auto":  # the application's palette: Matplotlib's canvas widget keeps its own
+            return is_dark()
+        return self._scheme == "dark"
+
+    def _show_marker_colors(self, marker_id: str) -> None:
+        """Give a marker's artists the colours of the current mode (opacities kept)."""
+        marker = self._markers[marker_id]
+        if marker.kind in _SPAN_KINDS:
+            face, edge = self._shown(("face", marker_id)), self._shown(("edge", marker_id))
+            for artist in marker.artists:
+                artist.set_facecolor(mcolors.to_rgba(face, mcolors.to_rgba(artist.get_facecolor())[3]))
+                artist.set_edgecolor(mcolors.to_rgba(edge, mcolors.to_rgba(artist.get_edgecolor())[3]))
+        else:
+            color = self._shown(("line", marker_id))
+            for artist in marker.artists:
+                artist.set_color(mcolors.to_rgba(color, mcolors.to_rgba(artist.get_color())[3]))
+
+    def _apply_scheme(self, dark: bool, notify: bool = True) -> None:
+        """Draw everything in light or dark colours (does not redraw)."""
+        self._dark = dark
+        frame = self._dark_frame if dark else self._light_frame
+        text = frame["text"]
+        tick = frame["edge"] if dark else frame["tick"]
+        ticklabel = text if dark else frame["ticklabel"]
+        self.figure.set_facecolor(frame["figure"])
+        for axis in self._axes.values():
+            ax = axis.ax
+            if axis.twin_of is None:
+                ax.set_facecolor(frame["axes"])
+                for spine in ax.spines.values():
+                    spine.set_edgecolor(frame["edge"])
+            ax.tick_params(axis="both", which="both", color=tick, labelcolor=ticklabel)
+            for label_axis in (ax.xaxis, ax.yaxis):
+                label_axis.label.set_color(text)
+                label_axis.get_offset_text().set_color(ticklabel)
+        for cid, curve in self._curves.items():
+            curve.line.set_color(self._shown(("curve", cid)))
+        for mid in self._markers:
+            self._show_marker_colors(mid)
+        for axis in self._axes.values():
+            self._refresh_axis(axis)
+        for panel_id in self._legends:
+            self._update_legend(panel_id)
+        if notify:  # colour swatches in menus and selectors follow
+            for cid in self._curves:
+                self.curveStyleChanged.emit(cid)
+            for mid in self.span_ids():
+                self.spanStyleChanged.emit(mid)
+
+    def set_scheme(self, scheme: str) -> None:
+        """Follow the application palette (``"auto"``) or keep the plot ``"light"`` or ``"dark"``.
+
+        Raises:
+            ValueError: For any other value.
+        """
+        if scheme not in _SCHEMES:
+            raise ValueError(f"scheme must be one of {', '.join(_SCHEMES)}, got {scheme!r}")
+        self._scheme = scheme
+        self._check_scheme()
+
+    def scheme(self) -> str:
+        """Return the scheme setting: ``"auto"``, ``"light"`` or ``"dark"``."""
+        return self._scheme
+
+    def shows_dark(self) -> bool:
+        """Return whether the plot is drawn in dark colours now."""
+        return self._dark
+
+    def _check_scheme(self) -> None:
+        """Switch between light and dark colours if needed, and redraw."""
+        self._scheme_check_pending = False
+        dark = self._wants_dark()
+        if dark != self._dark:
+            self._apply_scheme(dark)
+            self.redraw()
+
+    def changeEvent(self, event: QEvent) -> None:
+        """Follow a palette change (light or dark mode) from the event loop."""
+        super().changeEvent(event)
+        if event.type() == QEvent.PaletteChange and self._scheme == "auto" and not self._scheme_check_pending:
+            self._scheme_check_pending = True
+            QTimer.singleShot(0, self, self._check_scheme)
+
     # ----- keeping an axis consistent with its primary curve -----
     def _primary_color(self, axis: _Axis) -> Optional[str]:
         """Return the colour of the axis' primary curve, if any."""
         curve = axis.curves.get(axis.primary) if axis.primary else None
-        return mcolors.to_hex(curve.line.get_color()) if curve is not None else None
+        return self._shown(("curve", curve.id)) if curve is not None else None
 
     def _refresh_axis(self, axis: _Axis) -> None:
         """Update y label, zero line and grid after a primary/colour change."""
@@ -522,7 +666,8 @@ class PlotCanvas(FigureCanvasQTAgg):
 
         color = self._primary_color(axis)
         if axis.zero_line is not None:
-            axis.zero_line.set_color(color or self._axes_style["zero_line"].get("color", "k"))
+            zero = self._axes_style["zero_line"].get("color", "k")
+            axis.zero_line.set_color(color or (self._dark_version(zero) if self._dark else zero))
 
         if axis.select_one:  # nothing selected: hide this axis' value scale
             has = primary is not None
@@ -581,6 +726,11 @@ class PlotCanvas(FigureCanvasQTAgg):
         if handles:
             legend = top.legend(handles, labels, **self._legends[panel_id])
             legend.set_visible(self._legend_on.get(panel_id, True))
+            if self._dark:
+                legend.get_frame().set_facecolor(self._dark_frame["legend_face"])
+                legend.get_frame().set_edgecolor(self._dark_frame["legend_edge"])
+                for text in legend.get_texts():
+                    text.set_color(self._dark_frame["text"])
 
     # ----- lookups -----
     def _axis(self, axis_id: str) -> _Axis:
@@ -662,9 +812,20 @@ class PlotCanvas(FigureCanvasQTAgg):
 
     # ----- style -----
     def set_curve_style(self, curve_id: str, **props: Any) -> None:
-        """Change line properties of a curve, e.g. ``color="r", linewidth=2``."""
+        """Change line properties of a curve, e.g. ``color="r", linewidth=2``.
+
+        ``color`` is the light-mode colour; ``dark_color`` is the curve's own
+        dark-mode colour (``None``: automatic, see ``dark_variant``).
+        """
         curve = self._curve(curve_id)
+        entry = self._colors[("curve", curve_id)]
+        if "color" in props:
+            entry[0] = mcolors.to_hex(props.pop("color"))
+        if "dark_color" in props:
+            dark = props.pop("dark_color")
+            entry[1] = None if dark is None else mcolors.to_hex(dark)
         curve.line.set(**props)
+        curve.line.set_color(self._shown(("curve", curve_id)))
         axis = self._axes[curve.axis_id]
         if axis.primary == curve_id:
             self._refresh_axis(axis)
@@ -672,15 +833,27 @@ class PlotCanvas(FigureCanvasQTAgg):
         self.curveStyleChanged.emit(curve_id)
 
     def get_curve_style(self, curve_id: str) -> Dict[str, Any]:
-        """Return a curve's colour, line style and width, marker and marker size."""
+        """Return a curve's colour, line style and width, marker and marker size.
+
+        ``color`` is the light-mode colour and ``dark_color`` the curve's own
+        dark-mode colour, or ``None`` when it is automatic; ``curve_color``
+        returns the colour shown now.
+        """
         return self._style_of(curve_id)
+
+    def curve_color(self, curve_id: str) -> str:
+        """Return the colour a curve is drawn with now (light or dark mode)."""
+        self._curve(curve_id)
+        return self._shown(("curve", curve_id))
 
     def _style_of(self, curve_id: str) -> Dict[str, Any]:
         """The style as ``get_curve_style`` returns it; used internally so that
         subclasses may extend ``get_curve_style`` without affecting the canvas."""
         line = self._curve(curve_id).line
+        light, dark = self._colors[("curve", curve_id)]
         return {
-            "color": mcolors.to_hex(line.get_color()),
+            "color": light,
+            "dark_color": dark,
             "linestyle": line.get_linestyle(),
             "linewidth": float(line.get_linewidth()),
             "marker": line.get_marker(),
@@ -787,7 +960,9 @@ class PlotCanvas(FigureCanvasQTAgg):
             at: Position; defaults to 0 for lines and (0, 1) for bands.
             visible: Whether it is shown at first.
             name: Plain text for menus (default: the id).
-            **props: Matplotlib properties (``color``, ``alpha``, ...).
+            **props: Matplotlib properties (``color``, ``alpha``, ...), and
+                the dark-mode colours: ``dark_color`` (a line, or both parts
+                of a span), ``dark_facecolor``, ``dark_edgecolor`` (a span).
 
         Raises:
             ValueError: For a repeated id or an unknown kind.
@@ -797,6 +972,9 @@ class PlotCanvas(FigureCanvasQTAgg):
         if kind not in _MARKER_KINDS:
             raise ValueError(f"marker {marker_id!r}: kind must be one of {', '.join(_MARKER_KINDS)}")
         ids = [a for a, axis in self._axes.items() if axis.twin_of is None] if panels == "all" else list(panels)
+        dark_color = props.pop("dark_color", None)
+        dark_face = props.pop("dark_facecolor", dark_color)
+        dark_edge = props.pop("dark_edgecolor", dark_color)
         if at is None:
             at = (0.0, 1.0) if kind.endswith("span") else 0.0
         artists = []
@@ -811,11 +989,29 @@ class PlotCanvas(FigureCanvasQTAgg):
             else:
                 artists.append(ax.axhspan(at[0], at[1], **props))
         marker = _Marker(kind=kind, artists=artists, at=at, name=name or marker_id)
-        if artists:
-            marker.default_style = (_span_style_of(artists[0]) if kind in _SPAN_KINDS
-                                    else _line_style_of(artists[0]))
+
+        def own(color: Any) -> Optional[str]:
+            return None if color is None else mcolors.to_hex(color)
+
+        if kind in _SPAN_KINDS:
+            probe = artists[0] if artists else self.figure.axes[0].axvspan(0, 1, **props)
+            marker.default_style = _span_style_of(probe)
+            if not artists:
+                probe.remove()
+            self._colors[("face", marker_id)] = [marker.default_style["facecolor"], own(dark_face)]
+            self._colors[("edge", marker_id)] = [marker.default_style["edgecolor"], own(dark_edge)]
+            marker.default_style.update(dark_facecolor=own(dark_face), dark_edgecolor=own(dark_edge))
+        else:
+            probe = artists[0] if artists else self.figure.axes[0].axvline(0, **props)
+            marker.default_style = _line_style_of(probe)
+            if not artists:
+                probe.remove()
+            self._colors[("line", marker_id)] = [marker.default_style["center_color"], own(dark_color)]
+            marker.default_style["dark_center_color"] = own(dark_color)
         self._markers[marker_id] = marker
         self.set_marker_visible(marker_id, visible)
+        if self._dark:
+            self._show_marker_colors(marker_id)
 
     def _marker(self, marker_id: str) -> _Marker:
         try:
@@ -865,6 +1061,8 @@ class PlotCanvas(FigureCanvasQTAgg):
         marker = self._marker(marker_id)
         for artist in marker.artists:
             artist.remove()
+        for part in ("face", "edge", "line"):
+            self._colors.pop((part, marker_id), None)
         if marker.center is not None and marker.center in self._markers:
             self._markers[marker.center].center_of = None
         if marker.center_of is not None and marker.center_of in self._markers:
@@ -921,14 +1119,20 @@ class PlotCanvas(FigureCanvasQTAgg):
         ``edgecolor`` and ``edge_alpha`` (edge colour and opacity),
         ``linewidth`` and ``linestyle`` (edge line; ``"None"`` for no edge);
         with a centre line also ``center_color``, ``center_alpha``,
-        ``center_linewidth`` and ``center_linestyle``.
+        ``center_linewidth`` and ``center_linestyle``. Colours are the
+        light-mode ones; ``dark_facecolor``, ``dark_edgecolor`` and
+        ``dark_center_color`` are the span's own dark-mode colours, or
+        ``None`` when automatic.
         """
         marker = self._span(marker_id)
         style = _span_style_of(marker.artists[0]) if marker.artists else {
             k: marker.default_style[k] for k in _SPAN_STYLE_KEYS}
+        style["facecolor"], style["dark_facecolor"] = self._colors[("face", marker_id)]
+        style["edgecolor"], style["dark_edgecolor"] = self._colors[("edge", marker_id)]
         if marker.center is not None:
             line = self._markers[marker.center]
             style.update(_line_style_of(line.artists[0]) if line.artists else line.default_style)
+            style["center_color"], style["dark_center_color"] = self._colors[("line", marker.center)]
         return style
 
     def default_span_style(self, marker_id: str) -> Dict[str, Any]:
@@ -958,9 +1162,18 @@ class PlotCanvas(FigureCanvasQTAgg):
             raise ValueError(f"span style: unknown key(s) {sorted(unknown)}; "
                              f"allowed: {', '.join(allowed)}")
         style = {**self.get_span_style(marker_id), **props}
+
+        def own(color: Any) -> Optional[str]:
+            return None if color is None else mcolors.to_hex(color)
+
+        self._colors[("face", marker_id)] = [mcolors.to_hex(style["facecolor"]), own(style["dark_facecolor"])]
+        self._colors[("edge", marker_id)] = [mcolors.to_hex(style["edgecolor"]), own(style["dark_edgecolor"])]
+        if marker.center is not None:
+            self._colors[("line", marker.center)] = [mcolors.to_hex(style["center_color"]),
+                                                     own(style["dark_center_color"])]
         if any(k in props for k in _SPAN_STYLE_KEYS):
-            face = mcolors.to_rgba(style["facecolor"], float(style["alpha"]))
-            edge = mcolors.to_rgba(style["edgecolor"], float(style["edge_alpha"]))
+            face = mcolors.to_rgba(self._shown(("face", marker_id)), float(style["alpha"]))
+            edge = mcolors.to_rgba(self._shown(("edge", marker_id)), float(style["edge_alpha"]))
             for artist in marker.artists:
                 artist.set_alpha(None)  # the opacities live in the two colours
                 artist.set_facecolor(face)
@@ -969,7 +1182,7 @@ class PlotCanvas(FigureCanvasQTAgg):
                 artist.set_linestyle(style["linestyle"])
         if any(k in props for k in _CENTER_STYLE_KEYS):
             for artist in self._markers[marker.center].artists:
-                artist.set_color(style["center_color"])
+                artist.set_color(self._shown(("line", marker.center)))
                 artist.set_alpha(float(style["center_alpha"]))
                 artist.set_linewidth(float(style["center_linewidth"]))
                 artist.set_linestyle(style["center_linestyle"])
@@ -1140,7 +1353,7 @@ class PlotCanvas(FigureCanvasQTAgg):
             self.redraw()
 
         dialog = CurveStyleDialog(curve.name, before, self._default_styles[curve_id], self,
-                                  preview=preview)
+                                  preview=preview, auto_dark=self._dark_version)
         if dialog.exec() == QDialog.Accepted:
             self.set_curve_style(curve_id, **dialog.style())
             self._user_changed()
@@ -1173,7 +1386,8 @@ class PlotCanvas(FigureCanvasQTAgg):
             self.redraw()
 
         dialog = SpanStyleDialog(self._markers[marker_id].name, before,
-                                 self.default_span_style(marker_id), self, preview=preview)
+                                 self.default_span_style(marker_id), self, preview=preview,
+                                 auto_dark=self._dark_version)
         if dialog.exec() == QDialog.Accepted:
             self.set_span_style(marker_id, **dialog.style())
             self._user_changed()
@@ -1200,7 +1414,7 @@ class PlotCanvas(FigureCanvasQTAgg):
 
         if under is not None:
             act = action(f"Style of {under.name}…", lambda: self._edit_style(under.id))
-            act.setIcon(color_icon(self._style_of(under.id)["color"]))
+            act.setIcon(color_icon(self.curve_color(under.id)))
             act.setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
             menu.addSeparator()
 
@@ -1209,7 +1423,7 @@ class PlotCanvas(FigureCanvasQTAgg):
                 continue
             sub = menu.addMenu("Curves (right axis)" if axis.twin_of and len(group) > 1 else "Curves")
             for cid, curve in axis.curves.items():
-                item = sub.addMenu(color_icon(self._style_of(cid)["color"]), curve.name)
+                item = sub.addMenu(color_icon(self.curve_color(cid)), curve.name)
                 item.menuAction().setIconVisibleInMenu(True)  # macOS hides menu icons unless asked
                 action("Style…", lambda _=False, c=cid: self._edit_style(c), parent=item)
                 if not axis.select_one:
@@ -1243,14 +1457,14 @@ class PlotCanvas(FigureCanvasQTAgg):
         if len(panel_spans) == 1:
             mid = panel_spans[0]
             act = action(f"{self._markers[mid].name} style…", lambda: self._edit_span_style(mid))
-            act.setIcon(color_icon(self.get_span_style(mid)["facecolor"]))
+            act.setIcon(color_icon(self._shown(("face", mid))))
             act.setIconVisibleInMenu(True)
         elif panel_spans:
             span_menu = menu.addMenu("Span style")
             for mid in panel_spans:
                 act = action(f"{self._markers[mid].name}…",
                              lambda _=False, m=mid: self._edit_span_style(m), parent=span_menu)
-                act.setIcon(color_icon(self.get_span_style(mid)["facecolor"]))
+                act.setIcon(color_icon(self._shown(("face", mid))))
                 act.setIconVisibleInMenu(True)
 
         if panel_id in self._legends:
@@ -1278,18 +1492,34 @@ class PlotCanvas(FigureCanvasQTAgg):
         return menu
 
     def export(self, path: str, *, dpi: Optional[float] = None, pad_inches: float = 0.1,
-               **kwargs: Any) -> None:
+               scheme: str = "light", **kwargs: Any) -> None:
         """Save the figure to a file; the format follows the extension (pdf, png, svg, ...).
 
         Args:
             path: Output file.
             dpi: Resolution for bitmap formats (default: the figure's).
             pad_inches: Margin around the tight bounding box.
+            scheme: ``"light"`` (default; for papers and printing), ``"dark"``,
+                or ``"current"`` for the colours shown on screen.
             **kwargs: Further ``Figure.savefig`` arguments.
+
+        Raises:
+            ValueError: For an unknown ``scheme``.
         """
-        kwargs.setdefault("bbox_inches", "tight")
-        kwargs.setdefault("facecolor", self.figure.get_facecolor())
-        self.figure.savefig(path, dpi=dpi or self.figure.dpi, pad_inches=pad_inches, **kwargs)
+        if scheme not in ("light", "dark", "current"):
+            raise ValueError(f"scheme must be 'light', 'dark' or 'current', got {scheme!r}")
+        dark = self._dark if scheme == "current" else scheme == "dark"
+        shown = self._dark
+        if dark != shown:
+            self._apply_scheme(dark, notify=False)
+        try:
+            kwargs.setdefault("bbox_inches", "tight")
+            kwargs.setdefault("facecolor", self.figure.get_facecolor())
+            self.figure.savefig(path, dpi=dpi or self.figure.dpi, pad_inches=pad_inches, **kwargs)
+        finally:
+            if dark != shown:
+                self._apply_scheme(shown, notify=False)
+                self.redraw()
 
     def redraw(self) -> None:
         """Schedule a redraw (cheap to call often)."""

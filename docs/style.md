@@ -28,6 +28,8 @@ apply_sci_style(app)
 2. **Sets a style sheet** with the fonts and colors the widgets expect: slider
    values in blue, range labels slightly smaller, and blue text in line
    edits and spin boxes. Disabled widgets get a faded version of each color.
+   With a dark palette the blue is a lighter one (`#5aa9ff`) and the range
+   labels light grey.
 
 Without the style the widgets still work, but they behave and look different.
 
@@ -57,6 +59,43 @@ set `app.setFont(...)` **before** applying the style.
 The line-edit and spin-box rules apply to every `QLineEdit` and `QSpinBox` in
 the application, not only to those inside sciwidgets widgets. Override them in
 your own rules if other fields should look different.
+
+## Light and dark mode
+
+<img src="figures/theme_demo.png" width="900" alt="The sliders demo in light and dark mode">
+
+The widgets follow the application palette. Math labels (slider names, units,
+parameter labels) take the palette's text color, the style sheet picks its
+colors for a light or a dark palette, and a disabled slider groove is drawn in
+greys that suit the background. When the palette switches, for example when
+macOS changes appearance while the app is open, `apply_sci_style` sets the
+style sheet again by itself and the labels redraw.
+
+To force a scheme, or to offer a choice in a menu:
+
+```python
+from sciwidgets.style import color_scheme, is_dark, set_color_scheme
+
+set_color_scheme(app, "dark")    # or "light", or "system" to follow the system again
+is_dark()                        # True when the application palette is dark
+color_scheme()                   # the last choice: "light", "dark" or "system"
+```
+
+`set_color_scheme` asks Qt for the scheme (Qt 6.8 and later; on macOS this
+switches the whole app, native dialogs included). Where the platform gives no
+dark palette, it sets `dark_palette()`, a palette close to macOS Dark Mode.
+The `python -m sciwidgets.params` and `python -m sciwidgets.params.sliders`
+demos have a **Dark theme** check box.
+
+Colors you pass yourself (a label's `text_color`, a slider's marker color)
+stay as they are in both schemes. Plots and tables follow dark mode too (see
+[plot](plot.md#light-and-dark-mode) and [table](table.md#light-and-dark-mode));
+your own style sheet is not changed: check it in dark mode separately.
+
+`sciwidgets.colors` has the colour rules they use, for an app's own drawing:
+`dark_variant(color)` (a line or text colour readable on a dark background),
+`dark_fill(color)` (a background fill for dark mode), `readable_text(fill)`
+(black or white) and `contrast_ratio(a, b)`.
 
 ## Number formatting
 

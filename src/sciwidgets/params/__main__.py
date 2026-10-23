@@ -3,14 +3,14 @@
 import sys
 
 from PySide6.QtWidgets import (
-    QApplication, QFormLayout, QLabel, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QFormLayout, QFrame, QLabel, QVBoxLayout, QWidget,
 )
 
 from sciwidgets.params.combo_box import ParameterComboBox
 from sciwidgets.params.line_edit import ParameterLineEdit
 from sciwidgets.params.numeric_line_edit import NumericLineEdit
 from sciwidgets.params.toggle import ParameterToggle
-from sciwidgets.style import apply_sci_style
+from sciwidgets.style import apply_sci_style, is_dark, set_color_scheme
 
 
 def _demo_main() -> int:
@@ -71,6 +71,15 @@ def _demo_main() -> int:
         layout.addWidget(w)
 
     layout.addStretch(1)
+
+    line = QFrame()
+    line.setFrameShape(QFrame.HLine)
+    line.setFrameShadow(QFrame.Sunken)
+    layout.addWidget(line)
+    dark = QCheckBox("Dark theme")
+    dark.setChecked(is_dark())
+    dark.toggled.connect(lambda on: set_color_scheme(app, "dark" if on else "light"))
+    layout.addWidget(dark)
 
     win.adjustSize()
     win.show()

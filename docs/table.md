@@ -13,6 +13,8 @@ command. The rest of sciwidgets does not need pandas.
 
 Run `python -m sciwidgets.table` to try the view.
 
+<img src="figures/table_demo.png" width="900" alt="Table demo: coloured column groups, rich-text headers and values">
+
 ## DataFrameModel
 
 ```python
@@ -34,6 +36,8 @@ view.setModel(model)
 | `row_backgrounds` | callable taking a row (`pandas.Series`) and returning its background colour or `None`; wins over the column defaults, a user column colour wins over it |
 | `alignments` | `"left"`, `"center"` or `"right"` per column, as a dict or a callable taking the column name (`None` keeps the rule below) |
 | `headers` | header text per column; the column name by default |
+| `dark_backgrounds` | background per column in dark mode, same forms as `backgrounds`; columns not given get their light background darkened |
+| `dark` | show dark-mode colours; default: whether the application palette is dark (`DataFrameView` keeps it current) |
 
 Without an alignment, cells of numeric columns, and of columns that have a
 format, are right-aligned; the others left. Row headers count from 1.
@@ -113,4 +117,21 @@ so the app can keep it in `QSettings` and restore it with `set_config()`
 
 To add app-specific entries, connect to `headerMenuRequested(menu, column)`
 and `menu.addAction(...)` there.
+
+## Light and dark mode
+
+`DataFrameView` follows the application palette by itself
+(`model_().set_dark(bool)` and `model_().dark()` for a model on its own).
+All colours — `backgrounds`, `text_colors`, `row_backgrounds` and the
+user's — are light-mode colours. In dark mode:
+
+- a light background is shown darkened with its hue kept (tan → dark brown,
+  light blue → dark blue; `sciwidgets.colors.dark_fill`), unless
+  `dark_backgrounds` gives the column its own dark colour;
+- a text colour too dark for the dark table is shown lighter
+  (`sciwidgets.colors.dark_variant`).
+
+In both modes a cell with a background and no text colour of its own gets
+black or white text, whichever reads better on that background
+(`sciwidgets.colors.readable_text`).
 

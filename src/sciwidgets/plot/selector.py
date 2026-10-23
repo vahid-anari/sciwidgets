@@ -45,7 +45,7 @@ class CurveSelector(QComboBox):
         self._axis_id = axis_id
         self.setIconSize(QSize(12, 12))
         for curve_id in canvas.curve_ids(axis_id):
-            self.addItem(color_icon(canvas.get_curve_style(curve_id)["color"]),
+            self.addItem(color_icon(canvas.curve_color(curve_id)),
                          canvas.get_curve_name(curve_id), curve_id)
         if none_text is not None:
             self.addItem(none_text, None)
@@ -62,7 +62,7 @@ class CurveSelector(QComboBox):
     def _on_style_changed(self, curve_id: str) -> None:
         i = self.findData(curve_id)
         if i >= 0:
-            self.setItemIcon(i, color_icon(self._canvas.get_curve_style(curve_id)["color"]))
+            self.setItemIcon(i, color_icon(self._canvas.curve_color(curve_id)))
 
     def current(self) -> Optional[str]:
         """Return the chosen curve id (``None`` for the "none" entry)."""
@@ -118,4 +118,4 @@ class CurveCheckBox(QCheckBox):
 
     def _update_icon(self, curve_id: str) -> None:
         if curve_id == self._curve_id:
-            self.setIcon(color_icon(self._canvas.get_curve_style(curve_id)["color"]))
+            self.setIcon(color_icon(self._canvas.curve_color(curve_id)))

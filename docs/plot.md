@@ -134,14 +134,16 @@ span style; other lines (`vline`, `hline`) keep the `props` of the description.
 | `set_curve_data(id, x, y)`, `clear_curve(id)` | data |
 | `set_curve_visible(id, bool)`, `select_curve(panel, id)` | visibility |
 | `set_axis_visible(panel, bool)` | show or hide a whole panel or twin |
-| `set_curve_style(id, **props)`, `get_curve_style(id)` | colour, line, marker |
+| `set_curve_style(id, **props)`, `get_curve_style(id)` | colour (and `dark_color`), line, marker |
+| `curve_color(id)` | the colour a curve is drawn with now (light or dark mode) |
 | `set_limits(panel, x=..., y=...)`, `get_limits(panel)` | axis limits |
 | `set_label(panel, "x" or "y", label, unit)` | axis label |
 | `set_grid(panel, visible, which="major", direction="y")` | grid lines |
 | `set_legend_visible(panel, bool)` | legend |
 | `set_grid_style(linestyle=..., linewidth=..., alpha=...)`, `get_grid_style()` | style of all grid lines |
 | `set_span_style(id, **props)`, `get_span_style(id)`, `span_ids()` | fill and edge of a span |
-| `export(path)` | save as PDF, PNG, SVG, ... (from the extension) |
+| `export(path, scheme="light")` | save as PDF, PNG, SVG, ... (from the extension); light colours unless `scheme="current"` or `"dark"` |
+| `set_scheme("auto" | "light" | "dark")`, `scheme()`, `shows_dark()` | light and dark mode |
 | `redraw()` | schedule a redraw after changes |
 | `axes(panel)`, `line(id)` | the Matplotlib objects, for anything else |
 
@@ -161,6 +163,40 @@ keys of `DEFAULT_AXES_STYLE`:
   "zero_line": {"color": "k", "linestyle": "--", "alpha": 0.6}
 }
 ```
+
+## Light and dark mode
+
+The canvas follows the application palette (`scheme="auto"`, the default),
+so it turns dark with macOS Dark Mode or `sciwidgets.style.set_color_scheme`,
+and back. `PlotCanvas(description, scheme="light")` or `set_scheme("light")`
+keeps a plot light.
+
+In dark mode:
+
+- **The frame** takes the colours of `axes_style["dark"]`: figure and axes
+  backgrounds, text (labels, tick numbers, legend), axes edges and ticks,
+  legend box. The figure background can also be given as
+  `"figure": {"facecolor": "floralwhite", "dark_facecolor": "#2b2a27"}`.
+- **Colours too dark for the dark background** (contrast below 3 against the
+  axes background) are drawn lighter with their hue kept: black becomes light
+  grey, blue a lighter blue, navy a pale blue. Colours that already read well
+  stay exactly as they are. `dark_variant(color)` gives the colour used.
+- **An own dark colour** replaces the automatic one: `"dark_color"` in a curve's
+  style or props, or in a line marker's props; `"dark_facecolor"` and
+  `"dark_edgecolor"` (or `"dark_color"` for both) in a span's props:
+
+```json
+"flux": {"label": "F", "props": {"color": "b", "dark_color": "#88ccff"}}
+```
+
+The style dialogs show the light colour and, next to it, **Dark: Automatic**
+or **Own colour** with its own colour button. `get_curve_style` and
+`get_span_style` return the light colours plus `dark_color`
+(`dark_facecolor`, `dark_edgecolor`, `dark_center_color`), `None` meaning
+automatic; colour swatches in menus and selectors show the colour drawn now.
+
+Exports are light by default, also when the screen is dark, since they go
+into papers: `export(path, scheme="current")` saves what is on screen.
 
 ## What the user changes, and saving it
 
@@ -182,6 +218,11 @@ you can store (e.g. in `QSettings` as JSON):
  "grid_style": {"linestyle": ":", "alpha": 0.5},
  "markers": {"window": {"facecolor": "#2ca02c", "alpha": 0.2}}}
 ```
+
+Own dark-mode colours appear as `dark_color` (curves) and `dark_facecolor`,
+`dark_edgecolor`, `dark_center_color` (spans) next to the light ones; a
+config saved before dark mode existed loads as before, with automatic dark
+colours.
 
 `set_config(cfg)` restores it, `reset_config()` returns to the description.
 As with the parameter widgets, `configChanged` is emitted for user changes only,

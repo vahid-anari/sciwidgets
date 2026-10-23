@@ -17,12 +17,12 @@ from PySide6.QtWidgets import (
 )
 
 from sciwidgets.plot import CurveCheckBox, CurveSelector, PlotCanvas
-from sciwidgets.style import apply_sci_style
+from sciwidgets.style import apply_sci_style, is_dark, set_color_scheme
 
 # Plain JSON, as it would come from a settings file
 DESCRIPTION = json.loads(r"""
 {
-  "figure": {"figsize": [10, 6], "facecolor": "floralwhite",
+  "figure": {"figsize": [10, 6], "facecolor": "floralwhite", "dark_facecolor": "#2b2a27",
              "margins": {"left": 0.08, "right": 0.92, "bottom": 0.1, "top": 0.96}},
   "layout": {"mosaic": [["flux", "flux"], ["profiles", "spectrum"]],
              "height_ratios": [3, 2], "width_ratios": [2, 1], "hspace": 0.12, "wspace": 0.4,
@@ -138,9 +138,12 @@ def _demo_main() -> int:
     legend.toggled.connect(lambda on: ([canvas.set_legend_visible(p, on) for p in ("flux", "spectrum")],
                                        canvas.redraw()))
 
+    dark = QCheckBox("Dark theme", checked=is_dark())
+    dark.toggled.connect(lambda on: set_color_scheme(app, "dark" if on else "light"))
+
     controls = QHBoxLayout()
     controls.addWidget(QLabel("Bottom plot:"))
-    for w in (profile, show_w, show_fit, grid, legend, show_window):
+    for w in (profile, show_w, show_fit, grid, legend, show_window, dark):
         controls.addWidget(w)
     controls.addStretch(1)
     controls.addWidget(QLabel("Left-click the top panel: move the window · Right-click any panel: styles"))

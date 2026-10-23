@@ -50,12 +50,10 @@ def _demo_main() -> int:
         lbl = MathLabel(r"\eta", font_size=14, alignment=align, parent=box)
         lbl.setMinimumSize(90, 50)
         lbl.setAutoFillBackground(True)  # makes the label's area visible
-        lbl.setStyleSheet("background: #ffffff;")
         row.addWidget(lbl)
     stretched = MathLabel(r"\omega_0", font_size=14, keep_aspect_ratio=False, parent=box)
     stretched.setMinimumSize(90, 50)
     stretched.setAutoFillBackground(True)
-    stretched.setStyleSheet("background: #ffffff;")
     row.addWidget(stretched)
     root.addWidget(box)
 

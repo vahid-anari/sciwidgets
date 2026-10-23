@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 
 from matplotlib.figure import Figure
 
-from PySide6.QtCore import QSize, QRectF, QByteArray, Signal, Qt, QEvent
+from PySide6.QtCore import QSize, QRectF, QByteArray, Signal, Qt, QEvent, QTimer
 from PySide6.QtGui import QPainter, QPalette, QColor
 from PySide6.QtWidgets import QLabel, QWidget, QMenu
 from PySide6.QtSvg import QSvgRenderer
@@ -43,6 +43,9 @@ class MathLabel(QLabel):
         - The natural SVG size is cached and used as the widget's minimum size.
         - The label is regenerated when the enabled state changes so disabled
           text appearance stays in sync with the palette.
+        - Without an explicit ``text_color`` the text takes the palette's
+          ``WindowText`` color and is redrawn when the palette changes (light
+          or dark mode).
         - If LaTeX rendering is enabled and available, Matplotlib may use the
           system LaTeX installation for text rendering.
 
@@ -58,7 +61,7 @@ class MathLabel(QLabel):
             self,
             text: str = "",
             font_size: float = 18.0,
-            text_color: str | QColor = "black",
+            text_color: Optional[str | QColor] = None,
             pad_inches: float = 0.06,
             alignment: Qt.Alignment = Qt.AlignCenter,
             fix_size: bool = False,
@@ -72,7 +75,9 @@ class MathLabel(QLabel):
             text: Initial text to render. When non-empty, it is wrapped in
                 ``$...$`` before rendering so it is interpreted in math mode.
             font_size: Font size in points used by Matplotlib.
-            text_color: Text color used for rendering.
+            text_color: Text color used for rendering. ``None`` (default)
+                follows the palette's ``WindowText`` color, so the label suits
+                light and dark mode.
             pad_inches: Extra padding, in inches, added around the rendered text
                 when the SVG is saved with a tight bounding box.
             alignment: Alignment of the rendered SVG inside the widget.
@@ -98,7 +103,9 @@ class MathLabel(QLabel):
         # Store current text settings
         self._text: str = f"${text}$" if text else ""
         self._font_size: float = font_size
-        self._text_color = QColor(text_color)
+        self._text_color: Optional[QColor] = None if text_color is None else QColor(text_color)
+        self._rendered_color = None
+        self._color_check_pending = False
         self._use_tex: bool = _latex_enabled and use_tex
         self._pad_inches: float = pad_inches
         self._alignment: Qt.Alignment = alignment
@@ -231,11 +238,13 @@ class MathLabel(QLabel):
         effective text color. If loading succeeds, the widget's cached natural
         size, layout geometry, and display are refreshed.
         """
+        color = self._current_text_color()
+        self._rendered_color = color
         svg_bytes = self._create_text_svg(
             text=self._text,
             font_size=self._font_size,
             pad_inches=self._pad_inches,
-            color=self._current_text_color(),
+            color=color,
         )
 
         if self._renderer.load(QByteArray(svg_bytes)):
@@ -314,15 +323,19 @@ class MathLabel(QLabel):
     def _current_text_color(self):
         """Return the effective text color for the current widget state.
 
-        When the widget is disabled, the base text color keeps its RGB values
-        but adopts the alpha channel of the disabled ``WindowText`` palette
-        color.
+        The base color is ``text_color``, or the palette's ``WindowText`` when
+        none was given. When the widget is disabled, the base color keeps its
+        RGB values but adopts the alpha channel of the disabled ``WindowText``
+        palette color.
 
         Returns:
             tuple[float, float, float, float]: RGBA color components in the
             normalized format returned by :meth:`QColor.getRgbF`.
         """
-        base = QColor(self._text_color)
+        if self._text_color is not None:
+            base = QColor(self._text_color)
+        else:
+            base = QColor(self.palette().color(QPalette.Active, QPalette.WindowText))
 
         if not self.isEnabled():
             ref = self.palette().color(QPalette.Disabled, QPalette.WindowText)
@@ -335,13 +348,26 @@ class MathLabel(QLabel):
         """Handle widget state changes.
 
         When the enabled or disabled state changes, the SVG is regenerated so
-        the text appearance matches the current palette state.
+        the text appearance matches the current palette state. A palette change
+        (for example light to dark mode) regenerates it only when the text color
+        actually changes, from the event loop: Qt delivers palette changes to
+        every widget in one go, and rendering inside that delivery is slow and
+        not safe.
 
         Args:
             event: Qt change event delivered to the widget.
         """
         super().changeEvent(event)
         if event.type() == QEvent.EnabledChange:
+            self._update_from_text()
+        elif event.type() == QEvent.PaletteChange and self._text and not self._color_check_pending:
+            self._color_check_pending = True
+            QTimer.singleShot(0, self, self._check_color)
+
+    def _check_color(self) -> None:
+        """Render again if the effective text color changed since the last rendering."""
+        self._color_check_pending = False
+        if self._text and self._current_text_color() != self._rendered_color:
             self._update_from_text()
 
     def contextMenuEvent(self, event):

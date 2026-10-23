@@ -132,7 +132,8 @@ def test_span_style_from_description():
     assert style == {"facecolor": "#0000ff", "alpha": 0.1, "edgecolor": "#0000ff",
                      "edge_alpha": 0.1, "linewidth": style["linewidth"], "linestyle": "-",
                      "center_color": "#ff0000", "center_alpha": 0.6, "center_linewidth": 0.75,
-                     "center_linestyle": "-"}
+                     "center_linestyle": "-",
+                     "dark_facecolor": None, "dark_edgecolor": None, "dark_center_color": None}
     assert c.default_span_style("window") == style
     assert "center_color" not in c.get_span_style("band")      # no centre line
 

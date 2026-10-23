@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...dialogs import AskResult
+from ...style import is_dark
 from ._defaults import SliderBorderState
 from ._dialogs import multi_slider_ask_clamp_value
 from .base import SliderFeature
@@ -319,8 +320,9 @@ class MultiVariableSlider(FloatSlider):
 
         Returns:
             HTML string for a two-column table showing index and formatted value.
-            The active index is highlighted.
+            The active index is highlighted (light blue, or dark blue on a dark palette).
         """
+        current_bg = "#24405f" if is_dark(self.palette()) else "#eaf3ff"
         rows = [
             f"""
             <tr>
@@ -334,7 +336,7 @@ class MultiVariableSlider(FloatSlider):
             if i == self._current_idx:
                 rows.append(
                     f"""
-                    <tr style="background-color:#eaf3ff;">
+                    <tr style="background-color:{current_bg};">
                         <td style="padding:2px 12px 2px 0; white-space:nowrap;" align="right">{i}:</td>
                         <td style="padding:2px 0; white-space:nowrap;"><b>{value_text}</b> <span style="color:#888;">&larr; current</span></td>
                     </tr>

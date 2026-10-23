@@ -6,10 +6,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Union
 
 import pandas as pd
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo, QPalette
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QFontInfo
 from PySide6.QtWidgets import QColorDialog, QFontDialog, QMenu, QTableView, QWidget
 
+from ..style import is_dark
 from ._delegate import RichTextDelegate
 from ._dialogs import ChooseColumnsDialog
 from ._header import RichHeaderView
@@ -29,7 +30,8 @@ class DataFrameView(QTableView):
     color, text color, alignment, hide this column, choose columns, reset colors, font. Header
     texts and formatted values may be HTML (``<sup>``,
     ``<sub>``, ``&tau;``, ``<br>``), e.g. ``pretty_sci_text(v)`` as a format;
-    plain header texts use ``\\n`` for line breaks. What the
+    plain header texts use ``\\n`` for line breaks. Colors follow light and
+    dark mode by themselves (see :class:`DataFrameModel`). What the
     user changes there is returned by ``get_config`` so the app can store it
     (the view keeps no settings itself) and restored with ``set_config``.
 
@@ -66,6 +68,7 @@ class DataFrameView(QTableView):
         self._pending_alignments: Dict[str, str] = {}
         self._font_key: Optional[str] = None
         self._table_font: Optional[QFont] = None
+        self._scheme_check_pending = False
         header = RichHeaderView(self)
         self.setHorizontalHeader(header)
         self.setItemDelegate(RichTextDelegate(self))
@@ -86,6 +89,7 @@ class DataFrameView(QTableView):
             for kind in self._pending:
                 self._pending[kind].update(self._model.column_overrides(kind=kind))
             self._pending_alignments.update(self._model.alignment_overrides())
+        model_kwargs.setdefault("dark", is_dark())
         self._model = DataFrameModel(df, **model_kwargs, parent=self)
         self.setModel(self._model)
         columns = self._model.columns()
@@ -334,8 +338,21 @@ class DataFrameView(QTableView):
         self.headerMenuRequested.emit(menu, column)
         return menu
 
+    def changeEvent(self, event: QEvent) -> None:
+        """Follow a palette change (light or dark mode) from the event loop."""
+        super().changeEvent(event)
+        if event.type() == QEvent.PaletteChange and not self._scheme_check_pending:
+            self._scheme_check_pending = True
+            QTimer.singleShot(0, self, self._check_scheme)
+
+    def _check_scheme(self) -> None:
+        self._scheme_check_pending = False
+        if self._model is not None:
+            self._model.set_dark(is_dark())
+
     def _pick_color(self, column: str, *, kind: str = "background") -> None:
-        fallback = "white" if kind == "background" else self.palette().color(QPalette.Text).name()
+        # colours are light-mode colours (shown darkened or lightened in dark mode)
+        fallback = "white" if kind == "background" else "black"
         current = QColor(self.column_color(column, kind=kind) or fallback)
         what = "Color" if kind == "background" else "Text color"
         color = QColorDialog.getColor(current, self, f"{what} of column '{column}'")

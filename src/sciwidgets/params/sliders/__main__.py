@@ -19,7 +19,7 @@ from sciwidgets.params.sliders.base import SliderFeature
 from sciwidgets.params.sliders.single import ArraySlider, FloatSlider, IntSlider
 from sciwidgets.params.sliders.range import FloatRangeSlider, IntRangeSlider
 from sciwidgets.params.sliders.multi import MultiVariableSlider
-from sciwidgets.style import apply_sci_style
+from sciwidgets.style import apply_sci_style, is_dark, set_color_scheme
 
 
 def _demo_main() -> int:
@@ -183,6 +183,9 @@ def _demo_main() -> int:
     ranges.setChecked(True)
     allow_inf = QCheckBox("Allow T₂ = +inf")
     allow_inf.setChecked(True)
+    dark = QCheckBox("Dark theme")
+    dark.setChecked(is_dark())
+    dark.toggled.connect(lambda on: set_color_scheme(app, "dark" if on else "light"))
 
     def set_enabled(on: bool) -> None:
         for s in all_sliders:
@@ -200,6 +203,7 @@ def _demo_main() -> int:
     for cb in (enabled, ranges, allow_inf):
         controls.addWidget(cb)
     controls.addStretch(1)
+    controls.addWidget(dark)
     root.addLayout(controls)
 
     log_box = QGroupBox("Signals (user actions only)")

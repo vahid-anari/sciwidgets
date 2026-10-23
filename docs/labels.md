@@ -33,7 +33,7 @@ Use raw strings (`r"..."`) so backslashes reach LaTeX unchanged.
 |----------|---------|---------|
 | `text` | `""` | The expression, without `$` |
 | `font_size` | `18.0` | Font size in points |
-| `text_color` | `"black"` | Color name, hex string or `QColor` |
+| `text_color` | `None` | Color name, hex string or `QColor`; `None` follows the palette's text color (light and dark mode) |
 | `alignment` | `Qt.AlignCenter` | Position of the rendered text inside the label |
 | `fix_size` | `False` | Fix the label to the text's natural size instead of only using it as the minimum |
 | `keep_aspect_ratio` | `True` | Scale uniformly; `False` stretches the text to fill the label |

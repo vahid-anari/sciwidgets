@@ -3,6 +3,50 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.13.0 — 2026-10-22
+
+- Dark mode for the parameter widgets (sliders, line edits, combo boxes, toggles) and math labels:
+  - `MathLabel` text follows the palette's text color by default (`text_color=None`; it was black)
+    and is drawn again when the palette changes. An explicit `text_color` is kept.
+  - The style sheet uses a lighter blue for values and light grey range labels on a dark palette,
+    and `apply_sci_style` applies it again by itself when the palette switches between light and dark.
+  - A disabled slider groove is dark grey on a dark palette (it was a bright bar); the current row
+    in a multi-slider's value list is dark blue.
+  - New in `sciwidgets.style`: `set_color_scheme(app, "light" | "dark" | "system")`, `color_scheme()`,
+    `is_dark()` and `dark_palette()`. The params and sliders demos have a Dark theme check box.
+- Plots in dark mode (`sciwidgets.plot`):
+  - `PlotCanvas` follows the application palette (`scheme="auto"`, new argument; `set_scheme`,
+    `scheme()`, `shows_dark()`). In dark mode the frame (backgrounds, text, ticks, legend box) takes
+    the colours of `axes_style["dark"]`; the figure background can be set with
+    `figure.dark_facecolor`.
+  - Colours too dark for the dark background are drawn lighter with their hue kept (black → light
+    grey, blue → lighter blue); readable colours stay as they are. `dark_variant(color)` is public.
+  - A curve, line marker or span can have its own dark colour: `dark_color` (curves, lines),
+    `dark_facecolor`, `dark_edgecolor`, `dark_center_color` (spans), in the description, through
+    `set_curve_style`/`set_span_style`, and in the style dialogs (Dark: Automatic / Own colour).
+    They are saved in the config next to the light colours.
+  - `export()` saves the light colours by default, also from a dark screen (`scheme="current"`
+    for what is shown). `curve_color(id)` gives the colour drawn now; selectors and menu swatches
+    use it.
+  - `get_curve_style` and `get_span_style` also return the dark keys (`None` = automatic).
+- Tables in dark mode (`sciwidgets.table`): `DataFrameView` follows the application palette. Light
+  backgrounds (column, row and user colours) are shown darkened with their hue kept, too-dark text
+  colours lighter; `DataFrameModel(dark_backgrounds=..., dark=...)`, `set_dark()`, `dark()`. A cell
+  with a background and no text colour of its own gets black or white text, whichever reads better
+  (in light mode too: white text on a dark background a user chose). The colour dialog starts from
+  white / black, since stored colours are light-mode colours.
+- New module `sciwidgets.colors`: `dark_variant`, `dark_fill`, `readable_text`, `contrast_ratio`
+  (`dark_variant` is also in `sciwidgets.plot`).
+- Light mode looks exactly as before.
+- `python -m sciwidgets`: a showcase that uses the pieces together (a parameter panel from JSON driving a
+  plot, a line-list table, menus, status bar, About, dark mode). It is the README's new top picture;
+  the slider picture and animation moved to `docs/sliders.md`.
+- `tools/gifs.py` (repo only) records the animations from scripted demo sessions: `showcase.gif` (new,
+  under the README's top picture) and `sliders_demo.gif`.
+- `tools/screenshots.py` (repo only) retakes the documentation pictures from the demos, with window
+  frame and shadow on macOS (`pyobjc-framework-Quartz` in the `dev` extra there). New pictures:
+  `table_demo.png`, and `theme_demo.png` (light and dark) in `docs/style.md`.
+
 ## 0.12.3 — 2026-10-21
 
 - Updates: the notes of the newer versions only come from the app's own release tags (`v1.2.0` or

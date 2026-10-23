@@ -6,6 +6,10 @@ underneath. All of them are imported from `sciwidgets.params`.
 
 <img src="figures/sliders_demo.png" width="900" alt="Sliders demo">
 
+Right-click menu, Set Value and Edit Configuration:
+
+![Slider interaction](figures/sliders_demo.gif)
+
 | Slider | Value | Use it for |
 |--------|-------|------------|
 | `FloatSlider` | `float` (or `±inf`) | a single real parameter |

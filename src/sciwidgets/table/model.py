@@ -8,6 +8,10 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PySide6.QtGui import QBrush, QColor
+from PySide6.QtWidgets import QApplication
+
+from ..colors import dark_fill, dark_variant, readable_text
+from ..style import is_dark
 
 Formatter = Union[str, Callable[[Any], str]]
 Color = Union[str, QColor]
@@ -51,7 +55,18 @@ class DataFrameModel(QAbstractTableModel):
             (``None`` keeps the rule: right for numeric columns and columns
             with a format, left otherwise).
         headers: Per-column header text; the column name by default.
+        dark_backgrounds: Per-column background in dark mode, same forms as
+            ``backgrounds``; columns not given there get their light background
+            darkened (``dark_fill``).
+        dark: Show dark-mode colours; default: whether the application palette
+            is dark. ``DataFrameView`` keeps it up to date (``set_dark``).
         parent: Optional parent object.
+
+    Colors (constructor defaults and ``set_column_color``) are light-mode
+    colors. In dark mode a light background is shown darkened with its hue
+    kept, and a text color too dark for the dark table is shown lighter
+    (``dark_variant``). A cell with a background and no text color of its own
+    gets black or white text, whichever reads better on that background.
     """
 
     def __init__(
@@ -64,9 +79,14 @@ class DataFrameModel(QAbstractTableModel):
             row_backgrounds: Optional[RowColors] = None,
             alignments: Optional[Alignments] = None,
             headers: Optional[Dict[str, str]] = None,
+            dark_backgrounds: Optional[Backgrounds] = None,
+            dark: Optional[bool] = None,
             parent: Optional[QObject] = None,
     ) -> None:
         super().__init__(parent)
+        self._dark = bool(dark) if dark is not None else (QApplication.instance() is not None and is_dark())
+        self._dark_backgrounds = dark_backgrounds or {}
+        self._contrast_brushes: Dict[str, QBrush] = {}  # background colour -> readable text brush
         self._formats: Dict[str, Callable[[Any], str]] = {}
         for col, fmt in (formats or {}).items():
             self._formats[col] = fmt.format if isinstance(fmt, str) else fmt
@@ -148,10 +168,28 @@ class DataFrameModel(QAbstractTableModel):
         self._emit_column_changed(column)
 
     def column_color(self, column: str, *, kind: str = "background") -> Optional[str]:
-        """Return the effective color of ``column`` as ``#rrggbb``, or ``None``."""
+        """Return the effective (light-mode) color of ``column`` as ``#rrggbb``, or ``None``."""
         self._check(column, kind)
-        brush = self._brush(kind, column)
-        return brush.color().name() if brush is not None else None
+        color = self._color(kind, column)
+        return QColor(color).name() if color is not None else None
+
+    # ----- light and dark mode -----
+    def set_dark(self, dark: bool) -> None:
+        """Show light-mode (``False``) or dark-mode (``True``) colors."""
+        dark = bool(dark)
+        if dark == self._dark:
+            return
+        self._dark = dark
+        self._row_brushes = {}
+        for cache in self._brush_cache.values():
+            cache.clear()
+        if len(self._df) and self._columns:
+            self.dataChanged.emit(self.index(0, 0), self.index(len(self._df) - 1, len(self._columns) - 1),
+                                  [Qt.BackgroundRole, Qt.ForegroundRole])
+
+    def dark(self) -> bool:
+        """Return whether dark-mode colors are shown."""
+        return self._dark
 
     def column_overrides(self, *, kind: str = "background") -> Dict[str, Optional[str]]:
         """Return the user colors set with ``set_column_color`` (``None`` = no color)."""
@@ -236,7 +274,14 @@ class DataFrameModel(QAbstractTableModel):
                     return row_brush
             return self._brush("background", col)
         if role == _FOREGROUND:
-            return self._brush("text", col)
+            text = self._brush("text", col)
+            if text is not None:
+                return text
+            if self._row_backgrounds is not None and col not in self._overrides["background"]:
+                background = self._row_brush(index.row()) or self._brush("background", col)
+            else:
+                background = self._brush("background", col)
+            return self._contrast_brush(background) if background is not None else None
         return None
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
@@ -265,18 +310,42 @@ class DataFrameModel(QAbstractTableModel):
     def _row_brush(self, row: int) -> Optional[QBrush]:
         if row not in self._row_brushes:
             color = self._row_backgrounds(self._df.iloc[row])
+            if color is not None and self._dark:
+                color = dark_fill(QColor(color).name())
             self._row_brushes[row] = QBrush(QColor(color)) if color is not None else None
         return self._row_brushes[row]
+
+    @staticmethod
+    def _lookup(colors: Backgrounds, col: str) -> Optional[Color]:
+        return colors(col) if callable(colors) else colors.get(col)
+
+    def _color(self, kind: str, col: str) -> Optional[Color]:
+        """The light-mode color of a column: the user's, else the default."""
+        overrides = self._overrides[kind]
+        if col in overrides:
+            return overrides[col]
+        return self._lookup(self._defaults[kind], col)
 
     def _brush(self, kind: str, col: str) -> Optional[QBrush]:
         cache = self._brush_cache[kind]
         if col not in cache:
-            overrides, defaults = self._overrides[kind], self._defaults[kind]
-            if col in overrides:
-                color = overrides[col]
-            elif callable(defaults):
-                color = defaults(col)
-            else:
-                color = defaults.get(col)
+            color = self._color(kind, col)
+            if color is not None and self._dark:
+                name = QColor(color).name()
+                if kind == "text":
+                    color = dark_variant(name)
+                elif col in self._overrides["background"]:
+                    color = dark_fill(name)
+                else:
+                    own = self._lookup(self._dark_backgrounds, col)
+                    color = own if own is not None else dark_fill(name)
             cache[col] = QBrush(QColor(color)) if color is not None else None
         return cache[col]
+
+    def _contrast_brush(self, background: QBrush) -> QBrush:
+        """Black or white text, whichever reads better on ``background``."""
+        name = background.color().name()
+        brush = self._contrast_brushes.get(name)
+        if brush is None:
+            brush = self._contrast_brushes[name] = QBrush(QColor(readable_text(name)))
+        return brush

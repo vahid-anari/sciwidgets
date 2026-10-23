@@ -4,10 +4,12 @@ import sys
 
 import numpy as np
 import pandas as pd
-from PySide6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget,
+)
 
 from sciwidgets.formatting import pretty_sci_text
-from sciwidgets.style import apply_sci_style
+from sciwidgets.style import apply_sci_style, is_dark, set_color_scheme
 from sciwidgets.table import DataFrameView
 
 
@@ -63,9 +65,13 @@ def main() -> int:
     view.configChanged.connect(lambda cfg: (update_info(), print("config:", cfg)))
     update_info()
 
+    dark = QCheckBox("Dark theme", checked=is_dark())
+    dark.toggled.connect(lambda on: set_color_scheme(app, "dark" if on else "light"))
+
     row = QHBoxLayout()
     row.addWidget(choose)
     row.addWidget(save)
+    row.addWidget(dark)
     row.addStretch()
     row.addWidget(info)
     win = QWidget()
