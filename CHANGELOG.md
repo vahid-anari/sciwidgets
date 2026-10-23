@@ -3,6 +3,10 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.14.1 — 2026-10-22
+
+- Menu separators are visible in dark mode (Fusion drew them a shade darker than the menu).
+
 ## 0.14.0 — 2026-10-22
 
 - `sciwidgets.devtools`: take an app's documentation pictures and animated GIFs with scripts. An app

@@ -131,3 +131,21 @@ def test_slider_marker_uses_the_marker_color(qapp, scheme, colors):
     assert marker._current_color().name() == "#00aa00"
     scheme("dark")
     assert marker._current_color().name() == "#66ff66"
+
+
+def test_menu_separator_is_visible_in_dark_mode(qapp, scheme):
+    from PySide6.QtWidgets import QMenu
+    scheme("dark")
+    menu = QMenu()
+    one = menu.addAction("One")
+    separator = menu.addSeparator()
+    menu.addAction("Two")
+    menu.popup(menu.pos())
+    qapp.processEvents()
+    image = menu.grab().toImage()
+    rect = menu.actionGeometry(separator)
+    line = max(QColor(image.pixel(rect.center().x(), y)).lightness() for y in range(rect.top(), rect.bottom() + 1))
+    first = menu.actionGeometry(one)
+    background = QColor(image.pixel(first.right() - 3, first.top() + 1)).lightness()
+    menu.close()
+    assert line - background > 20

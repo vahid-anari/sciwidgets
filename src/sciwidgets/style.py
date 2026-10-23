@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QProxyStyle,
     QStyle,
     QStyleFactory,
+    QStyleOptionMenuItem,
     QStyleOptionSlider,
 )
 
@@ -294,6 +295,28 @@ class SciStyle(QProxyStyle):
             return super().drawComplexControl(control, option, painter, widget)
 
         return super().drawComplexControl(control, option, painter, widget)
+
+    def drawControl(self, element, option, painter, widget=None):
+        """Draw a Qt control; menu separators get a visible line in dark mode.
+
+        Fusion draws a menu separator a shade darker than the menu, which is
+        lost on a dark menu.
+
+        Args:
+            element: Control element to draw.
+            option: Style option describing the control.
+            painter: Painter used for rendering.
+            widget: Optional widget being drawn.
+        """
+        super().drawControl(element, option, painter, widget)
+        if (element == QStyle.CE_MenuItem and isinstance(option, QStyleOptionMenuItem)
+                and option.menuItemType == QStyleOptionMenuItem.Separator and is_dark(option.palette)):
+            r = option.rect
+            y = r.center().y()
+            painter.save()
+            painter.setPen(QPen(QColor(255, 255, 255, 64), 1))
+            painter.drawLine(r.left() + 5, y, r.right() - 5, y)
+            painter.restore()
 
     def drawPrimitive(self, element, option, painter, widget=None):
         """Draw a customized Qt primitive element.
