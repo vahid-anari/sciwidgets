@@ -70,6 +70,7 @@ and moved into this package so other apps can share them.
 | `sciwidgets.splash` | `SplashScreen`, `splash_message` | [Splash screen](https://github.com/vahid-anari/sciwidgets/blob/main/docs/splash.md) |
 | `sciwidgets.app` | `AppInfo`; `launcher.install_app_command`, `refresh_if_outdated`; `update.run_update`; `update_ui.AppUpdates`; `help.AppHelp` (shared Help menu, About with the libraries used) | [App launcher, updates, Help and About](https://github.com/vahid-anari/sciwidgets/blob/main/docs/app.md) |
 | `sciwidgets.window` | `MenuBarController`, `StatusBarController`, `center_on_screen` | [Window helpers](https://github.com/vahid-anari/sciwidgets/blob/main/docs/window.md) |
+| `sciwidgets.devtools` | `Shot`, `Gif`, `Player`, `main` (documentation pictures and GIFs taken by scripts) | [Documentation figures](https://github.com/vahid-anari/sciwidgets/blob/main/docs/devtools.md) |
 | `sciwidgets.style`, `sciwidgets.colors`, `sciwidgets.formatting` | `apply_sci_style`, `SciStyle`, `set_color_scheme`, `is_dark`; `dark_variant`, `dark_fill`; `value_to_text`, `pretty_sci_text` | [Style, dark mode and formatting](https://github.com/vahid-anari/sciwidgets/blob/main/docs/style.md) |
 
 ## Installation
@@ -181,11 +182,11 @@ The tests run without a window (Qt's offscreen platform) and take a few
 seconds. Pushing a tag `vX.Y.Z` publishes a GitHub Release with that
 version's section of `CHANGELOG.md`.
 
-`python tools/screenshots.py` retakes the pictures in `docs/figures/` from
-the demos (`--list` for the names, `--dark` to check dark mode). On macOS it
-captures the windows with title bar and shadow; the terminal needs Screen
-Recording permission. `python tools/gifs.py` records the animations from
-scripted sessions (slider drags, menus, dialogs).
+`python tools/figures.py` retakes the pictures and animations in
+`docs/figures/` from the demos (`--list` for the names, `--dark` to check dark
+mode), with [`sciwidgets.devtools`](https://github.com/vahid-anari/sciwidgets/blob/main/docs/devtools.md),
+which apps use for their own docs too. On macOS the pictures have the window's
+title bar and shadow; the terminal needs Screen Recording permission.
 
 ## Citing
 

@@ -3,6 +3,15 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.14.0 — 2026-10-22
+
+- `sciwidgets.devtools`: take an app's documentation pictures and animated GIFs with scripts. An app
+  lists `Shot`s and `Gif`s in a small tool file and calls `main`; each item runs in a fresh process with
+  empty settings, a script (`Player`: drag sliders, right-click, choose menu items, type into dialogs,
+  press buttons, wait for a result) brings the app into the state to show, and the window is captured
+  (on macOS with title bar and shadow) or recorded. `--dark` takes a picture in dark mode.
+- The repo's `tools/screenshots.py` and `tools/gifs.py` became one `tools/figures.py` built on it.
+
 ## 0.13.1 — 2026-10-22
 
 - The widgets' own colors can be changed: `set_sci_colors(app, value=..., range_label=..., marker=...,
