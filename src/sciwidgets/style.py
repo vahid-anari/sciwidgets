@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QStyleFactory,
     QStyleOptionMenuItem,
     QStyleOptionSlider,
+    QWidget,
 )
 
 __all__ = [
@@ -178,7 +179,7 @@ def set_sci_colors(app: Optional[QApplication] = None, **colors: ColorPair) -> N
         if watcher is not None:
             watcher.refresh(force=True)
         for widget in app.allWidgets():
-            widget.update()
+            QWidget.update(widget)  # item views overload update(index); widget.update() then fails
 
 
 _scheme: str = "system"

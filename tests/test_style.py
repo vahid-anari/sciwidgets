@@ -160,3 +160,14 @@ def test_input_edges_are_visible_in_dark_mode(qapp, scheme):
         edge = QColor(image.pixel(field.width() // 2, 0)).lightness()
         inside = QColor(image.pixel(field.width() // 2, 4)).lightness()
         assert edge - inside > 20, type(field).__name__
+
+
+def test_set_sci_colors_with_item_views(qapp, colors):
+    """Item views overload update(index): the redraw must call QWidget.update (failed on macOS)."""
+    from PySide6.QtWidgets import QComboBox, QListView, QTableView
+    from sciwidgets.style import set_sci_colors
+
+    views = [QListView(), QTableView(), QComboBox()]
+    set_sci_colors(qapp, marker="green")
+    for view in views:
+        view.deleteLater()

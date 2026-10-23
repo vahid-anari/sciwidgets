@@ -3,6 +3,11 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.15.4 — 2026-10-23
+
+- `set_sci_colors(app, ...)` no longer fails with "QListView.update() takes exactly one argument"
+  when the app has a list or table view (seen on macOS): the redraw calls `QWidget.update` directly.
+
 ## 0.15.3 — 2026-10-23
 
 - The update check and the download of updates use certifi's certificates (new dependency), as
