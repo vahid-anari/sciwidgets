@@ -1,11 +1,14 @@
-"""App plumbing shared by sciwidgets apps: double-click launcher and updates from PyPI.
+"""App plumbing shared by sciwidgets apps: double-click launcher and updates from PyPI or GitHub.
 
 Describe the app once in an :class:`AppInfo` and pass it to
 
 * :mod:`sciwidgets.app.launcher` — ``install_app`` / ``remove_app`` / ``refresh_if_outdated``
   (macOS app in ~/Applications, Windows Start-menu shortcut, Linux menu entry);
 * :mod:`sciwidgets.app.update` — the Qt-free part: latest version and release notes, how the app
-  was installed, the update command, ``run_update`` for an ``<app> update`` terminal command;
+  was installed, the update command, ``run_update`` for an ``<app> update`` terminal command,
+  and the access token of an app updated from a private GitHub repository;
+* :mod:`sciwidgets.app.github_install` — installs the newest release wheel of a (private) GitHub
+  repository; run as ``python -m sciwidgets.app.github_install`` by "Update Now" and install scripts;
 * :mod:`sciwidgets.app.update_ui` — the background check, update notice, "Update Now" with
   progress and restart, and :class:`~sciwidgets.app.update_ui.AppUpdates` for the menu flow;
 * :mod:`sciwidgets.app.help` — the Help menu every app shares (User Guide, documents, Check
@@ -19,6 +22,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+
+UPDATE_SOURCES = ("pypi", "github")
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,11 @@ class AppInfo:
             released, or existing launchers are no longer recognised.
         comment: One-line description for the Linux menu entry.
         categories: Linux menu categories, e.g. "Science;Physics;".
+        update_source: Where new versions come from. ``"pypi"`` (default): the version from
+            PyPI, the notes from the public GitHub Releases. ``"github"``: everything from the
+            GitHub Releases of ``github_repo``, which may be private; each release carries the
+            built wheel as an asset, and an access token (see
+            :func:`sciwidgets.app.update.token_path`) is sent with every request.
     """
 
     name: str
@@ -54,6 +64,16 @@ class AppInfo:
     marker: str
     comment: str = ""
     categories: str = "Science;"
+    update_source: str = "pypi"
+
+    def __post_init__(self) -> None:
+        if self.update_source not in UPDATE_SOURCES:
+            raise ValueError(f"update_source must be one of {UPDATE_SOURCES}, not {self.update_source!r}")
+
+    @property
+    def from_github(self) -> bool:
+        """Whether new versions come from the GitHub Releases (``update_source="github"``)."""
+        return self.update_source == "github"
 
     @property
     def pypi_url(self) -> str:
@@ -76,4 +96,4 @@ class AppInfo:
         return f"https://api.github.com/repos/{self.github_repo}/releases?per_page=30"
 
 
-__all__ = ["AppInfo"]
+__all__ = ["AppInfo", "UPDATE_SOURCES"]

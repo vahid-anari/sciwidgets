@@ -2,6 +2,9 @@
 
 The check reads the latest version from PyPI and, when it is newer, the release notes from
 GitHub; both requests go through ``QNetworkAccessManager``, so they never block the window.
+An app with ``AppInfo(update_source="github")`` reads both from its (private) GitHub Releases
+in one request with its access token; when the token is missing or refused, a manual check asks
+for a new one (a refused token is also asked about by the quiet check).
 :class:`AppUpdates` puts it all together for a main window::
 
     updates = AppUpdates(window, APP_INFO)
@@ -23,7 +26,9 @@ from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequ
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QTextBrowser,
@@ -39,11 +44,18 @@ from sciwidgets.app.update import (
     RETRY_WAIT_S,
     install_kind,
     installed_version,
+    latest_release,
+    missing_token_message,
     newer_release_notes,
     not_updated_message,
     parse_version,
+    read_token,
+    refused_token_message,
     retry_message,
+    save_token,
+    token_path,
     update_command,
+    update_tries,
     version_known,
 )
 from sciwidgets.dialogs import show_information, show_warning
@@ -52,13 +64,16 @@ REQUEST_TIMEOUT_MS = 5000
 
 
 class UpdateChecker(QObject):
-    """Query PyPI asynchronously and report whether a newer version exists."""
+    """Query PyPI (or the app's GitHub Releases) asynchronously and report whether a newer version exists."""
 
     updateAvailable = Signal(str, object)
     """``(latest_version, notes)``; ``notes`` are ``(version, markdown)`` pairs, newest first (may be empty)."""
 
     upToDate = Signal()
     checkFailed = Signal(str)
+    accessDenied = Signal(str, bool)
+    """``(message, token_refused)``: an app updated from GitHub has no access token (``False``)
+    or GitHub refused it (``True``)."""
 
     def __init__(self, info: AppInfo, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -70,8 +85,49 @@ class UpdateChecker(QObject):
         if not version_known(self._info.version):
             self.checkFailed.emit(f"The running version is unknown ({self._info.name} is not installed as a package).")
             return
+        if self._info.from_github:
+            self._check_github()
+            return
         reply = self._manager.get(self._request(self._info.pypi_json_url))
         reply.finished.connect(lambda: self._on_version(reply))
+
+    def _check_github(self) -> None:
+        token = read_token(token_path(self._info))
+        if not token:
+            self.accessDenied.emit(missing_token_message(self._info), False)
+            return
+        request = self._request(self._info.releases_api_url)
+        request.setRawHeader(b"Accept", b"application/vnd.github+json")
+        request.setRawHeader(b"Authorization", f"Bearer {token}".encode())
+        reply = self._manager.get(request)
+        reply.finished.connect(lambda: self._on_github_releases(reply))
+
+    def _on_github_releases(self, reply: QNetworkReply) -> None:
+        try:
+            status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+            if status in (401, 403, 404):
+                self.accessDenied.emit(refused_token_message(self._info), True)
+                return
+            if reply.error() != QNetworkReply.NetworkError.NoError:
+                self.checkFailed.emit(reply.errorString())
+                return
+            self.handle_releases(json.loads(bytes(reply.readAll()).decode("utf-8")))
+        except (ValueError, TypeError) as exc:
+            self.checkFailed.emit(str(exc))
+        finally:
+            reply.deleteLater()
+
+    def handle_releases(self, releases: object) -> None:
+        """Compare the newest GitHub release (with a wheel) with the running version."""
+        found = latest_release(releases) if isinstance(releases, list) else None
+        if found is None:
+            self.checkFailed.emit(f"{self._info.github_repo} has no release with a wheel yet.")
+            return
+        latest = found[0]
+        if parse_version(latest) <= parse_version(self._info.version):
+            self.upToDate.emit()
+            return
+        self.updateAvailable.emit(latest, newer_release_notes(releases, self._info.version, latest))
 
     def _request(self, url: str) -> QNetworkRequest:
         request = QNetworkRequest(QUrl(url))
@@ -151,6 +207,9 @@ class UpdateDialog(QDialog):
             how_text = ("<b>Update Now</b> runs, while the app stays open:"
                         f"<pre>    {escape(update_command)}</pre>"
                         "Restart the app afterwards to use the new version.")
+        elif info.from_github:
+            how_text = ("To update, close the app and run in a terminal:"
+                        f"<pre>    {escape(info.command)} update</pre>")
         else:
             command = update_command or f"pipx upgrade {info.dist_name}"
             how_text = ("To update, close the app and run in a terminal:"
@@ -170,6 +229,9 @@ class UpdateDialog(QDialog):
         notes_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(info.releases_url)))
         pypi_btn = QPushButton("Open PyPI Page")
         pypi_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(info.pypi_url)))
+        if info.from_github:  # no PyPI page; a private repository's pages need a GitHub sign-in
+            notes_btn.hide()
+            pypi_btn.hide()
         later_btn = QPushButton("Later")
         later_btn.clicked.connect(self.accept)
         self.update_btn = QPushButton("Update Now")
@@ -408,6 +470,7 @@ class AppUpdates(QObject):
         self.checker.updateAvailable.connect(self._on_update_available)
         self.checker.upToDate.connect(self._on_up_to_date)
         self.checker.checkFailed.connect(self._on_failed)
+        self.checker.accessDenied.connect(self._on_access_denied)
 
     @property
     def busy(self) -> bool:
@@ -443,7 +506,7 @@ class AppUpdates(QObject):
             command, self._info, latest,
             manual_hint=(f"Close the app and run <code>{escape(self._info.command)} update</code> in a terminal "
                          f"(or <code>{escape(' '.join(command))}</code>)."),
-            parent=self._window, success_note=self._success_note,
+            parent=self._window, success_note=self._success_note, tries=update_tries(self._info),
         )
         progress.exec()
         if progress.restart_requested:
@@ -458,6 +521,24 @@ class AppUpdates(QObject):
         finally:
             self._busy = False
 
+    def _on_access_denied(self, message: str, refused: bool) -> None:
+        """No token, or a refused one: ask for a new token (a missing one only when asked by the user)."""
+        manual, self._manual = self._manual, False
+        token = ""
+        try:
+            if manual or refused:
+                token = ask_token(self._window, self._info, message)
+                if token:
+                    save_token(token_path(self._info), token)
+        except OSError as exc:
+            show_warning("Update Check Failed", "Could not save the access token.", escape(str(exc)),
+                         parent=self._window)
+            token = ""
+        finally:
+            self._busy = False
+        if token:
+            self.check(manual=True)
+
     def _on_failed(self, message: str) -> None:
         manual, self._manual = self._manual, False
         try:
@@ -466,3 +547,13 @@ class AppUpdates(QObject):
                              parent=self._window)
         finally:
             self._busy = False
+
+
+def ask_token(parent: QWidget | None, info: AppInfo, message: str) -> str:
+    """Ask for a GitHub access token (hidden input); ``""`` when cancelled."""
+    token, ok = QInputDialog.getText(
+        parent, "Access Token",
+        f"{message}\n\nPaste the access token for {info.name}'s updates:",
+        QLineEdit.EchoMode.Password,
+    )
+    return token.strip() if ok else ""

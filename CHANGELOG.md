@@ -3,6 +3,17 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.15.0 — 2026-10-23
+
+- Apps can be updated from the GitHub Releases of a private repository instead of PyPI:
+  `AppInfo(update_source="github")`. Each release carries the built wheel; the version, the notes
+  and the wheel are read with a GitHub access token kept in the user's app-data folder
+  (`token_path`, `read_token`, `save_token`). "Update Now" and `<app> update` run the new
+  `python -m sciwidgets.app.github_install`, which downloads the newest wheel with the token and
+  installs it with pip (no git, and no token in URLs or pip's records). A missing or refused token
+  is asked for again from Check for Updates… (a refused one also at start-up), or with
+  `<app> update --token`. PyPI stays the default, so existing apps are unchanged.
+
 ## 0.14.3 — 2026-10-23
 
 - devtools: an animation keeps its colours when they change on the way (e.g. a switch to dark mode);

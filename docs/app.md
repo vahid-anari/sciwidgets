@@ -1,7 +1,8 @@
 # App launcher, updates, Help menu and About
 
-Plumbing for a sciwidgets app that is installed from PyPI: a launcher so it starts
-with a double-click, and an update check with "Update Now". Import it from
+Plumbing for a sciwidgets app that is installed from PyPI (or from the releases of a private
+GitHub repository): a launcher so it starts with a double-click, and an update check with
+"Update Now". Import it from
 `sciwidgets.app`. Maxwell Bloch Studio and linecat (Line Catalog Explorer) use it.
 
 ## Describe the app once
@@ -76,6 +77,42 @@ in a progress window and then offers a restart (`python -m <module>` in the same
 manual check also reports "up to date" and failures. `success_note` adds a sentence after the
 restart question, e.g. about unsaved work. The pieces — `UpdateChecker`, `UpdateDialog`,
 `UpdateProgressDialog`, `restart_app` — can be used on their own.
+
+## Updates from a private GitHub repository
+
+An app that is not on PyPI, e.g. one shared with a few colleagues before its paper is out, can
+be updated from the GitHub Releases of its (private) repository instead:
+
+```python
+APP = AppInfo(..., github_repo="owner/name", update_source="github")
+```
+
+- **Each release carries the built wheel** as an asset (`python -m build`, then attach
+  `dist/*.whl` to the GitHub Release, e.g. in the release workflow). The newest published
+  release with a wheel is the latest version; its notes are the "What's new".
+- **Access token**: every request sends a GitHub token kept in `token_path(APP)` —
+  `~/Library/Application Support/<name>/token` on macOS, `%APPDATA%\<name>\token` on
+  Windows, `~/.config/<linux_id>/token` on Linux (readable by the user only). Use a
+  fine-grained token limited to that one repository with *Contents: read*, and give it an
+  expiry date. The users need no GitHub account.
+- **Update Now** and `<app> update` run `python -m sciwidgets.app.github_install --repo owner/name
+  --token-file PATH` in the app's own Python: it downloads the newest wheel with the token into
+  a temporary folder and runs `pip install --upgrade` on it (dependencies from PyPI). No git is
+  needed, and the token never appears in a URL or in pip's records.
+- **A missing or refused token**: Check for Updates… asks for a new one (hidden input) and
+  checks again; the quiet start-up check asks only when a stored token was refused (expired or
+  revoked). On the command line: `<app> update --token` (give the app's `update` command a
+  `--token` flag; `run_update` reads `args.token`).
+- **First installation** (an install script, so users need no pipx): create a venv, `pip install
+  sciwidgets`, save the token with `save_token(token_path(APP), token)` or by writing the file,
+  run `python -m sciwidgets.app.github_install --repo owner/name --token-file PATH`, then
+  `<app> install-app`.
+- The update notice has no "Open Release Notes" / "Open PyPI Page" buttons (a private
+  repository's pages need a GitHub sign-in), and an update is run once (PyPI's index lag, which
+  the retries are for, does not apply).
+
+Also in `sciwidgets.app.update`: `read_token`, `save_token`, `github_releases`,
+`latest_release`, `wheel_asset`, `download_wheel`, `AccessDenied`.
 
 ## Help menu and About (`sciwidgets.app.help`, `sciwidgets.app.about`)
 
