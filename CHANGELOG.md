@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.15.2 — 2026-10-23
+
+- The update notice of an app updated from GitHub says in words what Update Now does, instead of
+  showing its long command (the paths to the app's Python and token made the window very wide);
+  the commands shown for other apps wrap instead of widening the window.
+
 ## 0.15.1 — 2026-10-23
 
 - `FloatSlider`, `IntSlider`, `ArraySlider` and `MultiVariableSlider` have `set_unit(unit)` and

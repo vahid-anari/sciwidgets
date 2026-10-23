@@ -171,6 +171,12 @@ class UpdateChecker(QObject):
         self.updateAvailable.emit(latest, notes)
 
 
+def command_html(command: str) -> str:
+    """A command as an indented monospace paragraph that wraps (a ``<pre>`` would widen the dialog)."""
+    return (f'<p style="margin-left: 16px; font-family: monospace; white-space: pre-wrap;">'
+            f"{escape(command)}</p>")
+
+
 def notes_markdown(notes: Sequence[tuple[str, str]]) -> str:
     """The notes of several versions as one Markdown text, one ``###`` heading per version."""
     return "\n\n".join(f"### {version}\n\n{body.strip()}" for version, body in notes)
@@ -203,17 +209,21 @@ class UpdateDialog(QDialog):
                          f"You have version {escape(info.version)}.")
         if hint:
             how_text = escape(hint)
+        elif can_update and info.from_github:
+            how_text = (f"<b>Update Now</b> downloads version {escape(latest)} from the app's GitHub releases "
+                        "and installs it, while the app stays open. Restart the app afterwards to use the "
+                        "new version.")
         elif can_update:
             how_text = ("<b>Update Now</b> runs, while the app stays open:"
-                        f"<pre>    {escape(update_command)}</pre>"
+                        f"{command_html(update_command)}"
                         "Restart the app afterwards to use the new version.")
         elif info.from_github:
             how_text = ("To update, close the app and run in a terminal:"
-                        f"<pre>    {escape(info.command)} update</pre>")
+                        f"{command_html(info.command + ' update')}")
         else:
             command = update_command or f"pipx upgrade {info.dist_name}"
             how_text = ("To update, close the app and run in a terminal:"
-                        f"<pre>    {escape(command)}</pre>"
+                        f"{command_html(command)}"
                         f"(or <code>pip install -U {escape(info.dist_name)}</code> in the environment "
                         "where you installed it).")
         how = QLabel(how_text)

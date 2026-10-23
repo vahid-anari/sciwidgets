@@ -280,3 +280,19 @@ def test_checker_over_the_network(info, token_file, fake_github, monkeypatch, sp
         QTest.qWait(20)
     assert available.calls[0][0] == "1.4.0"
     assert fake_github.seen[-1][1] == "Bearer good-token"
+
+
+def test_dialog_stays_narrow(info, qapp):
+    """The GitHub update command is long (paths to the app's Python and token); it must not widen the notice."""
+    from PySide6.QtWidgets import QLabel
+
+    long_command = "/Users/someone/Library/Application Support/Demo App/venv/bin/python -m " \
+                   "sciwidgets.app.github_install --repo someone/demo-app --token-file " \
+                   "/Users/someone/Library/Application Support/Demo App/token"
+    github = update_ui.UpdateDialog(info, "1.4.0", long_command, [("1.4.0", "- four")], can_update=True)
+    texts = " ".join(label.text() for label in github.findChildren(QLabel))
+    assert "github_install" not in texts and "GitHub releases" in texts
+    pypi = AppInfo(**{**info.__dict__, "update_source": "pypi"})
+    for dialog in (github, update_ui.UpdateDialog(pypi, "1.4.0", long_command, [], can_update=True)):
+        assert dialog.minimumSizeHint().width() < 700
+        dialog.deleteLater()
