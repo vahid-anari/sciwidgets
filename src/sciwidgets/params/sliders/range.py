@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from ...dialogs import AskResult, show_warning
 from ...formatting import format_is_valid, get_numeric_format_field
 from ...labels import MathLabel
+from ...style import sci_color
 from ._defaults import UNIT_LABEL_SIZE, SliderBorderState
 from ._dialogs import range_slider_ask_clamp_value, range_slider_ask_extend_range
 from .base import SliderFeature, SliderWidgetBase
@@ -605,7 +606,7 @@ class RangeMarkerOverlay(QWidget):
             upper_value_fn,
             *,
             thickness: int = 2,
-            color: QColor | str = Qt.red,
+            color: QColor | str | None = None,
     ):
         """Initialize the range-marker overlay.
 
@@ -614,14 +615,15 @@ class RangeMarkerOverlay(QWidget):
             lower_value_fn: Callable returning the lower marker value.
             upper_value_fn: Callable returning the upper marker value.
             thickness: Marker line thickness in pixels.
-            color: Marker color.
+            color: Marker color; ``None`` (default) uses the ``marker`` color of
+                ``sciwidgets.style.set_sci_colors`` (red, lighter in dark mode).
         """
         super().__init__(slider)
         self._slider = slider
         self._lower_value_fn = lower_value_fn
         self._upper_value_fn = upper_value_fn
         self._thickness = thickness
-        self._color = QColor(color)
+        self._color = None if color is None else QColor(color)
 
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
@@ -633,7 +635,7 @@ class RangeMarkerOverlay(QWidget):
 
     def _current_color(self):
         """Return the effective marker color for the current enabled state."""
-        c = QColor(self._color)
+        c = QColor(self._color) if self._color is not None else QColor(sci_color("marker"))
         if not self._slider.isEnabled():
             ref = self.palette().color(QPalette.Disabled, QPalette.WindowText)
             c.setAlphaF(ref.alphaF())

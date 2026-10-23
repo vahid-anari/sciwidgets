@@ -83,3 +83,51 @@ def test_math_label_keeps_an_explicit_color(qapp, scheme):
     scheme("dark")
     qapp.processEvents()
     assert _rgb(label._rendered_color) == (1.0, 0.0, 0.0)
+
+
+# ----- the widgets' own colors (0.13.1) -----
+
+@pytest.fixture
+def colors(qapp):
+    """Put the default colors back after the test."""
+    from sciwidgets.style import DEFAULT_SCI_COLORS, set_sci_colors
+    yield
+    set_sci_colors(qapp, **{name: None for name in DEFAULT_SCI_COLORS})
+    qapp.processEvents()
+
+
+def test_set_sci_colors(qapp, scheme, colors):
+    from sciwidgets.style import sci_color, set_sci_colors
+    scheme("light")
+    assert sci_color("value") == "#0000ff" and sci_color("marker", dark=True) == "#ff6b6b"
+    set_sci_colors(qapp, value=("#0055cc", "#6cb4ff"), marker="green")
+    assert "#0055cc" in qapp.styleSheet() and "#0000ff" not in qapp.styleSheet()
+    assert sci_color("marker", dark=False) == sci_color("marker", dark=True) == QColor("green").name()
+    scheme("dark")
+    assert "#6cb4ff" in qapp.styleSheet()
+    set_sci_colors(qapp, value="accent")
+    assert sci_color("value") == qapp.palette().color(QPalette.Highlight).name()
+    set_sci_colors(qapp, value=None)
+    assert sci_color("value", dark=False) == "#0000ff"
+    with pytest.raises(ValueError):
+        set_sci_colors(qapp, values="red")
+    with pytest.raises(ValueError):
+        set_sci_colors(qapp, value="not-a-colour")
+
+
+def test_double_spin_boxes_get_the_value_color(qapp, scheme):
+    scheme("light")
+    assert "QAbstractSpinBox{" in qapp.styleSheet()
+
+
+def test_slider_marker_uses_the_marker_color(qapp, scheme, colors):
+    from sciwidgets.params import FloatSlider
+    from sciwidgets.style import set_sci_colors
+    scheme("light")
+    slider = FloatSlider(label="x", min_val=0.0, max_val=1.0, init_val=0.5)
+    marker = next(c for c in slider.findChildren(object) if type(c).__name__ == "MarkerOverlay")
+    assert marker._current_color().name() == "#ff0000"
+    set_sci_colors(qapp, marker=("#00aa00", "#66ff66"))
+    assert marker._current_color().name() == "#00aa00"
+    scheme("dark")
+    assert marker._current_color().name() == "#66ff66"

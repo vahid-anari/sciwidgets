@@ -87,6 +87,32 @@ dark palette, it sets `dark_palette()`, a palette close to macOS Dark Mode.
 The `python -m sciwidgets.params` and `python -m sciwidgets.params.sliders`
 demos have a **Dark theme** check box.
 
+### The widgets' own colors
+
+Four colors are the widgets' own, each with a light and a dark version:
+
+| Name | Default (light, dark) | Used for |
+|------|-----------------------|----------|
+| `value` | blue, `#5aa9ff` | slider values; text in line edits and spin boxes |
+| `range_label` | black, `#d0d0d0` | the min/max labels under sliders |
+| `marker` | red, `#ff6b6b` | the default-value tick on sliders |
+| `invalid` | `#d32f2f`, `#ff6b6b` | the frame around invalid input |
+
+Change them for the whole app, once at start-up or at any time:
+
+```python
+from sciwidgets.style import apply_sci_style, set_sci_colors
+
+apply_sci_style(app, my_rules, colors={"value": ("#0055cc", "#6cb4ff")})
+set_sci_colors(app, marker="green")          # one color for both modes
+set_sci_colors(app, value="accent")          # the system accent color (macOS)
+set_sci_colors(app, value=None)              # back to the default
+```
+
+`"accent"` is the palette's highlight color: on macOS the accent color chosen
+in System Settings → Appearance, which also fills the slider grooves.
+`sci_color(name)` returns a color for the current mode.
+
 Colors you pass yourself (a label's `text_color`, a slider's marker color)
 stay as they are in both schemes. Plots and tables follow dark mode too (see
 [plot](plot.md#light-and-dark-mode) and [table](table.md#light-and-dark-mode));

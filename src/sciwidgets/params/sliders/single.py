@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from ...dialogs import AskResult, show_warning
 from ...formatting import format_is_valid, get_numeric_format_field, pretty_sci_text
 from ...labels import MathLabel
+from ...style import sci_color
 from ..numeric_line_edit import NumericLineEdit
 from ._defaults import UNIT_LABEL_SIZE, SliderBorderState
 from ._dialogs import slider_ask_clamp_value, slider_ask_extend_range
@@ -153,7 +154,7 @@ class MarkerOverlay(QWidget):
             value_fn: Callable[[], int],
             *,
             thickness: int = 2,
-            color: QColor | str = Qt.red,
+            color: QColor | str | None = None,
     ):
         """Initialize the marker overlay.
 
@@ -161,13 +162,14 @@ class MarkerOverlay(QWidget):
             slider: Slider that owns the overlay.
             value_fn: Callable returning the logical slider position to mark.
             thickness: Marker line thickness in pixels.
-            color: Marker color.
+            color: Marker color; ``None`` (default) uses the ``marker`` color of
+                ``sciwidgets.style.set_sci_colors`` (red, lighter in dark mode).
         """
         super().__init__(slider)
         self._slider = slider
         self._value_fn = value_fn
         self._thickness = thickness
-        self._color = QColor(color)
+        self._color = None if color is None else QColor(color)
 
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_NoSystemBackground, True)
@@ -183,7 +185,7 @@ class MarkerOverlay(QWidget):
         Returns:
             Marker color, possibly dimmed when the slider is disabled.
         """
-        c = QColor(self._color)
+        c = QColor(self._color) if self._color is not None else QColor(sci_color("marker"))
         if not self._slider.isEnabled():
             ref = self.palette().color(QPalette.Disabled, QPalette.WindowText)
             c.setAlphaF(ref.alphaF())

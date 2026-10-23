@@ -3,6 +3,17 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.13.1 — 2026-10-22
+
+- The widgets' own colors can be changed: `set_sci_colors(app, value=..., range_label=..., marker=...,
+  invalid=...)` with a (light, dark) pair, one color for both modes, `"accent"` (the system accent
+  color) or `None` for the default; also `apply_sci_style(app, rules, colors={...})`. `sci_color(name)`
+  and `DEFAULT_SCI_COLORS` are public.
+- Slider default markers are a lighter red in dark mode (`#ff6b6b`).
+- `QDoubleSpinBox` (and the date and time editors) get the value color like `QSpinBox` and `QLineEdit`
+  (the rule is now on `QAbstractSpinBox`).
+- The style sheet is also applied again when the accent color changes.
+
 ## 0.13.0 — 2026-10-22
 
 - Dark mode for the parameter widgets (sliders, line edits, combo boxes, toggles) and math labels:
