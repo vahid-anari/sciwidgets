@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.15.1 — 2026-10-23
+
+- `FloatSlider`, `IntSlider`, `ArraySlider` and `MultiVariableSlider` have `set_unit(unit)` and
+  `get_unit()`: the unit after the value can change while the app runs (e.g. seconds → days);
+  `""` hides it, and a slider made without a unit can get one.
+
 ## 0.15.0 — 2026-10-23
 
 - Apps can be updated from the GitHub Releases of a private repository instead of PyPI:

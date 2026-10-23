@@ -510,15 +510,44 @@ class LabeledSliderBase(SliderWidgetBase[TNum], Generic[TNum]):
         l.addWidget(self._value_label)
         l.setContentsMargins(0, 0, 0, 0)
         l.setSpacing(0)
+        self._unit_label: MathLabel | None = None
         if unit:
             self._unit_label = MathLabel(f"({unit})", parent=self, fix_size=True, font_size=UNIT_LABEL_SIZE)
             l.addWidget(self._unit_label)
         l.addStretch(1)
         self._value_and_unit = w
+        self._value_and_unit_layout = l
 
         self._attach_slider(QSlider(self._orient))
         self.set_format(val_fmt)
         self._make_layout()
+
+    # ----- unit -----
+    def get_unit(self) -> str:
+        """Return the unit shown after the value (LaTeX, ``""`` for none)."""
+        return self._unit
+
+    def set_unit(self, unit: str) -> None:
+        """Show another unit after the value, e.g. when the app switches from seconds to days.
+
+        Only the text changes: the value, range and default stay as they are, so convert them
+        yourself (``set_config``, ``set_default_value``, ``set_value``). Silent, like the other
+        setters; the value column is measured again (``valueWidthChanged``).
+
+        Args:
+            unit: Unit in LaTeX without ``$`` or parentheses; ``""`` hides it.
+        """
+        self._unit = unit
+        if unit:
+            if self._unit_label is None:
+                self._unit_label = MathLabel(f"({unit})", parent=self, fix_size=True, font_size=UNIT_LABEL_SIZE)
+                self._value_and_unit_layout.insertWidget(1, self._unit_label)
+            else:
+                self._unit_label.set_text(f"({unit})")
+            self._unit_label.show()
+        elif self._unit_label is not None:
+            self._unit_label.hide()
+        self._update_value_width()
 
     # ----- SliderWidgetBase hooks -----
     def _make_default_marker(self) -> QWidget:

@@ -144,3 +144,20 @@ def test_combo_box_set_items(spy):
     assert w.get_value() == "x" and len(s) == 0
     with pytest.raises(ValueError):
         w.set_items([])
+
+
+def test_slider_set_unit(spy):
+    """An app that switches time units shows the new unit after the value; the value is untouched."""
+    s = FloatSlider(label="T_1", unit=r"\mathrm{s}", min_val=1.0, max_val=10.0, init_val=5.0)
+    widths, values = spy(s.valueWidthChanged), spy(s.valueChanged)
+    assert s.get_unit() == r"\mathrm{s}"
+    s.set_unit(r"\mathrm{yr}")
+    assert s.get_unit() == r"\mathrm{yr}" and s.get_value() == 5.0 and len(values) == 0
+    assert s._unit_label._text == r"$(\mathrm{yr})$" and not s._unit_label.isHidden()
+    s.set_unit("")
+    assert s._unit_label.isHidden()
+    bare = IntSlider(label="n", min_val=1, max_val=9, init_val=3)       # made without a unit
+    bare.set_unit(r"\mathrm{d}")
+    assert bare._unit_label is not None and not bare._unit_label.isHidden()
+    assert bare._value_and_unit_layout.indexOf(bare._unit_label) == 1    # after the value
+    assert len(widths) >= 1

@@ -99,7 +99,14 @@ t2.set_value(2.5)         # back to a finite value
 
 **Useful methods:** `get_value()`, `set_value(v)`, `get_default_value()`,
 `set_default_value(v)`, `set_range(min, max)`, `get_config()`,
-`set_config(cfg)`.
+`set_config(cfg)`, `get_unit()`, `set_unit(unit)`.
+
+**Changing the unit.** `set_unit(r"\mathrm{d}")` shows another unit after the
+value (also on a slider made without one; `""` hides it), e.g. when the app
+switches from seconds to days. Only the text changes: convert the range,
+default and value yourself with `set_config`, `set_default_value` and
+`set_value`. (`FloatSlider`, `IntSlider`, `ArraySlider`,
+`MultiVariableSlider`.)
 
 ## ArraySlider
 
