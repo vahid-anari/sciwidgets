@@ -3,6 +3,11 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.14.3 — 2026-10-23
+
+- devtools: an animation keeps its colours when they change on the way (e.g. a switch to dark mode);
+  the GIF palette is made from frames spread over the whole animation, not from the middle one.
+
 ## 0.14.2 — 2026-10-23
 
 - Line edits and spin boxes have a visible edge in dark mode (Fusion's edge is a shade darker than

@@ -227,7 +227,14 @@ def save_gif(frames: List, out: Path, width: int) -> None:
         if im.width != width:
             im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
         images.append(im)
-    palette = images[len(images) // 2].quantize(colors=255, method=Image.Quantize.MEDIANCUT)
+    # one palette for every frame, from up to eight frames spread over the animation (so that a switch
+    # to dark mode, or colours that appear late, keep their colours)
+    picks = images[::max(1, len(images) // 8)][:8]
+    w, h = max(1, picks[0].width // 2), max(1, picks[0].height // 2)
+    mosaic = Image.new("RGB", (w, h * len(picks)))
+    for i, im in enumerate(picks):
+        mosaic.paste(im.resize((w, h)), (0, i * h))
+    palette = mosaic.quantize(colors=255, method=Image.Quantize.FASTOCTREE)
     paletted = [im.quantize(palette=palette, dither=Image.Dither.NONE) for im in images]
     durations = [FRAME_MS] * (len(paletted) - 1) + [HOLD_END_MS]
     Path(out).parent.mkdir(parents=True, exist_ok=True)
