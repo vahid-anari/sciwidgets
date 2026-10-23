@@ -3,6 +3,12 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## 0.15.3 — 2026-10-23
+
+- The update check and the download of updates use certifi's certificates (new dependency), as
+  pip does. With Python from python.org on macOS they failed with CERTIFICATE_VERIFY_FAILED until
+  its "Install Certificates" step had been run.
+
 ## 0.15.2 — 2026-10-23
 
 - The update notice of an app updated from GitHub says in words what Update Now does, instead of

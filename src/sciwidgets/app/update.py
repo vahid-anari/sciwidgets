@@ -15,6 +15,7 @@ import getpass
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import sys
 import time
@@ -38,6 +39,20 @@ MAX_NOTES = 10
 GITHUB_API = "https://api.github.com"
 INSTALL_MODULE = "sciwidgets.app.github_install"
 """Run as ``python -m`` to install the newest release wheel of a GitHub repository."""
+
+
+def ssl_context() -> ssl.SSLContext:
+    """Certificates for HTTPS: certifi's list (the one pip uses), else the system default.
+
+    Python from python.org on macOS has no certificates of its own until its "Install
+    Certificates" step has run, so without certifi every HTTPS request from the standard library
+    fails there with CERTIFICATE_VERIFY_FAILED (while pip, which carries certifi, works).
+    """
+    try:
+        import certifi
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 class AccessDenied(OSError):
@@ -109,7 +124,7 @@ def _github_request(url: str, token: str, accept: str, user_agent: str) -> urlli
 
 def _open_github(request: urllib.request.Request):
     try:
-        return urllib.request.urlopen(request, timeout=TIMEOUT_S)
+        return urllib.request.urlopen(request, timeout=TIMEOUT_S, context=ssl_context())
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403, 404):  # a private repository answers 404 to a token without access
             raise AccessDenied(f"GitHub refused the access token (HTTP {exc.code}).") from exc
@@ -233,7 +248,7 @@ def newer_release_notes(releases: list, current: str, latest: str, limit: int = 
 
 def _get_json(info: AppInfo, url: str):
     request = urllib.request.Request(url, headers={"User-Agent": f"{info.name}/{info.version}"})
-    with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:
+    with urllib.request.urlopen(request, timeout=TIMEOUT_S, context=ssl_context()) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

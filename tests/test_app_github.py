@@ -296,3 +296,31 @@ def test_dialog_stays_narrow(info, qapp):
     for dialog in (github, update_ui.UpdateDialog(pypi, "1.4.0", long_command, [], can_update=True)):
         assert dialog.minimumSizeHint().width() < 700
         dialog.deleteLater()
+
+
+def test_https_uses_certifi(monkeypatch):
+    """python.org's macOS Python has no CA certificates of its own; certifi's list is used instead."""
+    import certifi
+
+    seen = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"[]"
+
+    def fake_urlopen(request, timeout=None, context=None):
+        seen.append(context)
+        return Response()
+
+    monkeypatch.setattr(update.urllib.request, "urlopen", fake_urlopen)
+    assert update.github_releases("someone/demo-app", "t") == []
+    ctx = seen[0]
+    assert ctx is not None and ctx.verify_mode.name == "CERT_REQUIRED"
+    loaded = ctx.cert_store_stats()["x509_ca"]
+    assert loaded == update.ssl.create_default_context(cafile=certifi.where()).cert_store_stats()["x509_ca"] > 0

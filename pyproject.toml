@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sciwidgets"
-version = "0.15.2"
+version = "0.15.3"
 description = "PySide6 widgets for scientific desktop apps: LaTeX labels, sliders, parameter panels, Matplotlib plot canvas, DataFrame tables and dialogs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,6 +36,7 @@ dependencies = [
     "matplotlib>=3.7",
     "numpy>=1.24",
     "psutil>=5.9",
+    "certifi",  # HTTPS certificates for the update check (python.org's macOS Python has none by itself)
 ]
 
 [project.optional-dependencies]
