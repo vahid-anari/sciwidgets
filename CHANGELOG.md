@@ -3,6 +3,10 @@
 Each version is a Git tag (`vX.Y.Z`) and is on [PyPI](https://pypi.org/project/sciwidgets/).
 From 0.10.4 on, pushing a tag also publishes a GitHub Release with that version's notes.
 
+## Unreleased
+
+- Python 3.13 added to the classifiers (the tests run on 3.10 and 3.13), so PyPI's Python badge shows it.
+
 ## 0.15.4 — 2026-10-23
 
 - `set_sci_colors(app, ...)` no longer fails with "QListView.update() takes exactly one argument"
