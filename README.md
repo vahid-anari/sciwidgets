@@ -19,9 +19,7 @@ dialog, and switching to dark mode:
 
 ![Showcase in use](https://raw.githubusercontent.com/vahid-anari/sciwidgets/main/docs/figures/showcase.gif)
 
-The widgets were written for
-[Maxwell Bloch Studio](https://github.com/vahid-anari/maxwell-bloch-studio)
-and moved into this package so other apps can share them.
+The widgets were written for Maxwell Bloch Studio and moved into this package so other apps can share them.
 
 ## Features
 
@@ -204,6 +202,5 @@ Vahid Anari ·
 [LinkedIn](https://www.linkedin.com/in/vahid-anari/)
 
 Related projects: [mbsolver](https://github.com/vahid-anari/mbsolver) ·
-[Maxwell Bloch Studio](https://github.com/vahid-anari/maxwell-bloch-studio) ·
 [linecat](https://github.com/vahid-anari/linecat) ·
 [Daftarche](https://github.com/vahid-anari/daftarche)
